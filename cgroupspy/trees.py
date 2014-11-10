@@ -144,5 +144,5 @@ class VMTree(GroupedTree):
             return vm_node
         return super(VMTree, self)._create_node(name, parent=parent)
 
-    def get_vm_node(self, uuid):
-        return self.vms.get('{}.libvirt-qemu'.format(uuid))
+    def get_vm_node(self, name):
+        return self.vms.get('{}.libvirt-qemu'.format(name))

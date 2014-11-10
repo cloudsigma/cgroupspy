@@ -112,7 +112,7 @@ class IntegerListFile(ListFile):
 class CommaDashSetFile(BaseFileInterface):
 
     """
-    Builds a set from files containig the following data format 'cpuset.cpus: 1-3,6,11-15',
+    Builds a set from files containing the following data format 'cpuset.cpus: 1-3,6,11-15',
     returning {1,2,3,5,11,12,13,14,15}
     """
 

@@ -78,7 +78,7 @@ class CpuController(Controller):
     rt_period_us = IntegerFile("cpu.rt_period_us")
     rt_runtime_us = IntegerFile("cpu.rt_runtime_us")
     shares = IntegerFile("cpu.shares")
-    stat = IntegerFile("cpu.stat")
+    stat = DictFile("cpu.stat")
 
 
 class CpuAcctController(Controller):
