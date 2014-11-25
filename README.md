@@ -22,6 +22,51 @@ accessed via machine.cpus, machine.cpuset, etc.
 
 Example usage
 -------------
+```
+#Import the trees module, which contains a tree representation of cgroups
+>>> from cgroupspy import trees
+
+# This is the most basic type of cgroup tree. It models the filesystem.
+>>> t = trees.Tree()
+
+# It has a root which is of type Node
+>>> t.root
+<Node />
+
+# And the root has children
+>>> print t.root.children
+[<Node /hugetlb>, <Node /net_prio>, <Node /perf_event>, <Node /blkio>, <Node /net_cls>, <Node /freezer>, <Node /devices>, <Node /memory>, <Node /cpuacct>, <Node /cpu>, <Node /cpuset>, <Node /systemd>, <Node /cgmanager>]
+
+# You can for example get the cpuset
+>>> cset = t.get_node_by_path('/cpuset/')
+>>> cset
+<Node /cpuset>
+
+# The controller used for this cgroup is a CpuSetController
+>>> cset.controller
+<cgroupspy.controllers.CpuSetController object at 0x7f63a3843050>
+
+# Which can for example show you the cpu pinning
+>>> cset.controller.cpus
+set([0, 1])
+
+# You can create a cgroup
+>>> test = cset.create_cgroup('test')
+<Node /cpuset/test>
+
+# See its cpu restrictions
+>>> test.controller.cpus
+set([0, 1])
+
+# And change them
+>>> test.controller.cpus = [1]
+
+# The tasks in this cgroup are now restricted to cpu 1
+>>> test.controller.cpus
+set([1])
+```
+
+Another example with the VMTree - for managing libvirt guests
 
 ```python
 >>> from cgroupspy.trees import VMTree
