@@ -118,6 +118,33 @@ class Node(object):
             return self.CONTROLLERS[self.controller_type](self)
         return None
 
+    def create_cgroup(self, name):
+        """
+        Create a cgroup by name and attach it under this node.
+        """
+        node = Node(name, parent=self)
+        if node in self.children:
+            raise Exception('Node {} already exists under {}'.format(name, self.path))
+
+        fp = os.path.join(self.full_path, name)
+        os.mkdir(fp)
+        self.children.append(node)
+        return node
+
+    def delete_cgroup(self, name):
+        """
+        Delete a cgroup by name and detach it from this node.
+        """
+        node = Node(name, parent=self)
+        try:
+            self.children.remove(node)
+        except ValueError:
+            return
+        else:
+            fp = os.path.join(self.full_path, name)
+            if os.path.exists(fp):
+                os.rmdir(fp)
+
 
 class NodeControlGroup(object):
 

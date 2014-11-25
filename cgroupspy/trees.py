@@ -30,7 +30,7 @@ from .nodes import Node, NodeControlGroup, NodeVM
 from .utils import walk_tree
 
 
-class Tree(object):
+class BaseTree(object):
 
     """ A basic cgroup node tree. An exact representation of the filesystem tree, provided by cgroups. """
 
@@ -80,6 +80,14 @@ class Tree(object):
         return walk_tree(root)
 
 
+class Tree(BaseTree):
+    def get_node_by_path(self, path):
+        path = path.rstrip("/")
+        for node in self.walk():
+            if node.path == path:
+                return node
+
+
 class GroupedTree(object):
     """
     A grouped tree - that has access to all cgroup partitions with the same name ex:
@@ -90,7 +98,7 @@ class GroupedTree(object):
 
     def __init__(self, root_path="/sys/fs/cgroup", groups=None):
 
-        self.node_tree = Tree(root_path=root_path, groups=groups)
+        self.node_tree = BaseTree(root_path=root_path, groups=groups)
         self.control_root = NodeControlGroup(name="cgroup")
         for ctrl in self.node_tree.root.children:
             self.control_root.add_node(ctrl)

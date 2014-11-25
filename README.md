@@ -9,16 +9,16 @@ python objects to cgroups compatible strings and vise versa.
 
 Trees
 -----
-It has a couple of ways to represent the cgroups filesystem
+cgroupspy has a couple of ways to represent the cgroups filesystem
 
 * As a tree - this is the most basic and generic way to represent them. You basically construct it from all
 the directories in the cgroups root.
 
-* A grouped tree - that has access to all cgroup partitions with the same name, for example
+* A grouped tree - that has access to all cgroup partitions with the same name, on the same level. For example -
 'machine' partition in memory, cpuset, cpus, etc cgroups. All these attributes are
 accessed via machine.cpus, machine.cpuset, etc.
 
-* A VMTree - for simple management of libvirt guests
+* A VMTree - a subclass of grouped tree with utilities for simple management of libvirt guests
 
 Example usage
 -------------
@@ -54,5 +54,8 @@ Example usage
 {1, 2, 3}
 ```
 
+License
+-------
+new BSD licence
 
 
