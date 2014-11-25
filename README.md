@@ -22,7 +22,7 @@ accessed via machine.cpus, machine.cpuset, etc.
 
 Example usage
 -------------
-```
+```python
 #Import the trees module, which contains a tree representation of cgroups
 >>> from cgroupspy import trees
 
