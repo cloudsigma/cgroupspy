@@ -6,7 +6,7 @@ import cgroupspy
 try:
     with open('README.md') as file:
         long_description = file.read()
-except FileNotFoundError:
+except IOError:
     long_description = ""
 
 setup(
