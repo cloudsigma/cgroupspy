@@ -24,6 +24,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+import os
 
 
 def walk_tree(root):
@@ -32,3 +33,14 @@ def walk_tree(root):
     for child in root.children:
         for el in walk_tree(child):
             yield el
+
+
+def get_device_major_minor(dev_path):
+    """
+    Returns the device (major, minor) tuple for simplicity
+    :param dev_path: Path to the device
+    :return: (device major, device minor)
+    :rtype: (int, int)
+    """
+    stat = os.lstat(dev_path)
+    return os.major(stat.st_rdev), os.minor(stat.st_rdev)
