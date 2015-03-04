@@ -3,8 +3,11 @@
 from setuptools import setup
 import cgroupspy
 
-with open('README.md') as file:
-    long_description = file.read()
+try:
+    with open('README.md') as file:
+        long_description = file.read()
+except IOError:
+    long_description = ""
 
 setup(
     name='cgroupspy',
