@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from collections import Iterable
+from cgroupspy.contenttypes import DeviceAccess, BaseContentType
 
 
 class BaseFileInterface(object):
@@ -32,17 +33,31 @@ class BaseFileInterface(object):
     """
     Basic cgroups file interface, implemented as a python descriptor. Provides means to get and set cgroup properties.
     """
+    readonly = False
+    writeonly = False
 
-    def __init__(self, filename):
+    def __init__(self, filename, readonly=None, writeonly=None):
+        if readonly and writeonly:
+            raise Exception("This interface cannot be both readonly and writeonly")
+
         self.filename = filename
+        self.readonly = readonly or self.readonly
+        self.writeonly = writeonly or self.writeonly
 
     def __get__(self, instance, owner):
+        if self.writeonly:
+            raise Exception("This interface is writeonly")
+
         value = instance.get_property(self.filename)
         return self.sanitize_get(value)
 
     def __set__(self, instance, value):
+        if self.readonly:
+            raise Exception("This interface is readonly")
+
         value = self.sanitize_set(value)
-        return instance.set_property(self.filename, value)
+        if value is not None:
+            return instance.set_property(self.filename, value)
 
     def sanitize_get(self, value):
         return value
@@ -83,6 +98,7 @@ class IntegerFile(BaseFileInterface):
 
 
 class DictFile(BaseFileInterface):
+    readonly = True
 
     def sanitize_get(self, value):
         res = {}
@@ -93,6 +109,7 @@ class DictFile(BaseFileInterface):
 
 
 class ListFile(BaseFileInterface):
+    readonly = True
 
     def sanitize_get(self, value):
         return value.split()
@@ -103,6 +120,7 @@ class IntegerListFile(ListFile):
     """
     ex: 253237230463342 317756630269369 247294096796305 289833051422078
     """
+    readonly = True
 
     def sanitize_get(self, value):
         value_list = super(IntegerListFile, self).sanitize_get(value)
@@ -134,7 +152,53 @@ class CommaDashSetFile(BaseFileInterface):
 
 
 class MultiLineIntegerFile(BaseFileInterface):
+    readonly = True
 
     def sanitize_get(self, value):
         int_list = [int(val) for val in value.strip().split("\n") if val]
         return int_list
+
+
+class SplitValueFile(BaseFileInterface):
+    """
+    Example: Getting int(10) for file with value 'Total 10'. Readonly.
+    """
+    readonly = True
+
+    def __init__(self, filename, position, restype=None, splitchar=" "):
+        super(SplitValueFile, self).__init__(filename)
+        self.position = position
+        self.splitchar = splitchar
+        self.restype = restype
+
+    def sanitize_get(self, value):
+        res = value.strip().split(self.splitchar)[self.position]
+        if self.restype and not isinstance(res, self.restype):
+            return self.restype(res)
+        return res
+
+
+class TypedFile(BaseFileInterface):
+
+    def __init__(self, filename, contenttype, readonly=None, writeonly=None, many=False):
+        if not issubclass(contenttype, BaseContentType):
+            raise Exception("Contenttype should be a class inheriting "
+                            "from BaseContentType, not {}".format(contenttype))
+
+        self.contenttype = contenttype
+        self.many = many
+        super(TypedFile, self).__init__(filename, readonly=readonly, writeonly=writeonly)
+
+    def sanitize_set(self, value):
+        if isinstance(value, self.contenttype):
+            return value
+
+        return self.contenttype.from_string(value)
+
+    def sanitize_get(self, value):
+        res = [self.contenttype.from_string(val) for val in value.split("\n") if val]
+        if not self.many:
+            if res:
+                return res[0]
+            return None
+        return res

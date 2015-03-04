@@ -28,7 +28,8 @@ import logging
 
 import os
 
-from .controllers import CpuAcctController, CpuController, CpuSetController, MemoryController
+from .controllers import CpuAcctController, CpuController, CpuSetController, MemoryController, DevicesController, \
+    BlkIOController
 from .utils import walk_tree
 
 
@@ -51,7 +52,9 @@ class Node(object):
         "memory": MemoryController,
         "cpuset": CpuSetController,
         "cpu": CpuController,
-        "cpuacct": CpuAcctController
+        "cpuacct": CpuAcctController,
+        "devices": DevicesController,
+        "blkio": BlkIOController,
     }
 
     def __init__(self, name, parent=None):

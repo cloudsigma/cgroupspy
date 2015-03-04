@@ -25,9 +25,10 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import os
+from cgroupspy.contenttypes import DeviceAccess, DeviceThrottle
 
-from .interfaces import FlagFile, CommaDashSetFile, IntegerFile, \
-    MultiLineIntegerFile, DictFile, IntegerListFile
+from .interfaces import FlagFile, CommaDashSetFile, IntegerFile, SplitValueFile, TypedFile
+from .interfaces import MultiLineIntegerFile, DictFile, IntegerListFile
 
 
 class Controller(object):
@@ -177,3 +178,76 @@ class MemoryController(Controller):
 
     # Requires eventfd handling - https://www.kernel.org/doc/Documentation/cgroups/memory.txt
     # pressure_level =
+
+
+class DevicesController(Controller):
+    """
+    devices.allow
+    devices.deny
+    devices.list
+    """
+
+    allow = TypedFile("devices.allow", DeviceAccess, writeonly=True)
+    deny = TypedFile("devices.deny", DeviceAccess, writeonly=True)
+    list = TypedFile("devices.list", DeviceAccess, readonly=True, many=True)
+
+
+class BlkIOController(Controller):
+    """
+    blkio.io_merged
+    blkio.io_merged_recursive
+    blkio.io_queued
+    blkio.io_queued_recursive
+    blkio.io_service_bytes
+    blkio.io_service_bytes_recursive
+    blkio.io_serviced
+    blkio.io_serviced_recursive
+    blkio.io_service_time
+    blkio.io_service_time_recursive
+    blkio.io_wait_time
+    blkio.io_wait_time_recursive
+    blkio.leaf_weight
+    blkio.leaf_weight_device
+    blkio.reset_stats
+    blkio.sectors
+    blkio.sectors_recursive
+    blkio.throttle.io_service_bytes
+    blkio.throttle.io_serviced
+    blkio.throttle.read_bps_device
+    blkio.throttle.read_iops_device
+    blkio.throttle.write_bps_device
+    blkio.throttle.write_iops_device
+    blkio.time
+    blkio.time_recursive
+    blkio.weight
+    blkio.weight_device
+    """
+
+    io_merged = SplitValueFile("blkio.io_merged", 1, int)
+    io_merged_recursive = SplitValueFile("blkio.io_merged_recursive", 1, int)
+    io_queued = SplitValueFile("blkio.io_queued", 1, int)
+    io_queued_recursive = SplitValueFile("blkio.io_queued_recursive", 1, int)
+    io_service_bytes = SplitValueFile("blkio.io_service_bytes", 1, int)
+    io_service_bytes_recursive = SplitValueFile("blkio.io_service_bytes_recursive", 1, int)
+    io_serviced = SplitValueFile("blkio.io_serviced", 1, int)
+    io_serviced_recursive = SplitValueFile("blkio.io_serviced_recursive", 1, int)
+    io_service_time = SplitValueFile("blkio.io_service_time", 1, int)
+    io_service_time_recursive = SplitValueFile("blkio.io_service_time_recursive", 1, int)
+    io_wait_time = SplitValueFile("blkio.io_wait_time", 1, int)
+    io_wait_time_recursive = SplitValueFile("blkio.io_wait_time_recursive", 1, int)
+    leaf_weight = IntegerFile("blkio.leaf_weight")
+    # TODO: Uncomment the following properties after researching how to interact with files
+    # leaf_weight_device =
+    reset_stats = IntegerFile("blkio.reset_stats")
+    # sectors =
+    # sectors_recursive =
+    # throttle_io_service_bytes =
+    # throttle_io_serviced =
+    throttle_read_bps_device = TypedFile("blkio.throttle.read_bps_device", contenttype=DeviceThrottle, many=True)
+    throttle_read_iops_device = TypedFile("blkio.throttle.read_iops_device", contenttype=DeviceThrottle, many=True)
+    throttle_write_bps_device = TypedFile("blkio.throttle.write_bps_device ", contenttype=DeviceThrottle, many=True)
+    throttle_write_iops_device = TypedFile("blkio.throttle.write_iops_device ", contenttype=DeviceThrottle, many=True)
+    # time =
+    # time_recursive =
+    weight = IntegerFile("blkio.weight")
+    # weight_device =
