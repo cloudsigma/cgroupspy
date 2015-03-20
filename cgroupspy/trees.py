@@ -72,8 +72,8 @@ class BaseTree(object):
         Build a full or a partial tree, depending on the groups specified.
         """
 
-        if self.groups:
-            for group in self.groups:
+        if self._groups:
+            for group in self._groups:
                 node = Node(name=group, parent=self.root)
                 self.root.children.append(node)
                 self._init_children(node)
