@@ -29,7 +29,7 @@ import logging
 import os
 
 from .controllers import CpuAcctController, CpuController, CpuSetController, MemoryController, DevicesController, \
-    BlkIOController
+    BlkIOController, NetClsController, NetPrioController
 from .utils import walk_tree
 
 
@@ -55,6 +55,8 @@ class Node(object):
         "cpuacct": CpuAcctController,
         "devices": DevicesController,
         "blkio": BlkIOController,
+        "net_cls": NetClsController,
+        "net_prio": NetPrioController,
     }
 
     def __init__(self, name, parent=None):

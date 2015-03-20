@@ -98,7 +98,6 @@ class IntegerFile(BaseFileInterface):
 
 
 class DictFile(BaseFileInterface):
-    readonly = True
 
     def sanitize_get(self, value):
         res = {}
@@ -106,6 +105,11 @@ class DictFile(BaseFileInterface):
             key, val = el.split()
             res[key] = int(val)
         return res
+
+    def sanitize_set(self, value):
+        if not isinstance(value, dict):
+            raise Exception("Value {} must be a dict".format(value))
+        return ",".join(str(x) for x in value)
 
 
 class ListFile(BaseFileInterface):
