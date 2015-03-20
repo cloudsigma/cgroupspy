@@ -38,6 +38,7 @@ class Controller(object):
     """
 
     tasks = MultiLineIntegerFile("tasks")
+    procs = MultiLineIntegerFile("cgroup.procs")
     notify_on_release = FlagFile("notify_on_release")
     clone_children = FlagFile("cgroup.clone_children")
 
@@ -91,7 +92,7 @@ class CpuAcctController(Controller):
     """
     acct_stat = DictFile("cpuacct.stat", readonly=True)
     usage = IntegerFile("cpuacct.usage")
-    usage_percpu = IntegerListFile("cpuacct.usage_percpu")
+    usage_percpu = IntegerListFile("cpuacct.usage_percpu", readonly=True)
 
 
 class CpuSetController(Controller):

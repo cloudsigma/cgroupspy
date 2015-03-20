@@ -124,11 +124,15 @@ class IntegerListFile(ListFile):
     """
     ex: 253237230463342 317756630269369 247294096796305 289833051422078
     """
-    readonly = True
 
     def sanitize_get(self, value):
         value_list = super(IntegerListFile, self).sanitize_get(value)
         return map(int, value_list)
+
+    def sanitize_set(self, value):
+        if value is None:
+            value = -1
+        return int(value)
 
 
 class CommaDashSetFile(BaseFileInterface):
@@ -156,11 +160,15 @@ class CommaDashSetFile(BaseFileInterface):
 
 
 class MultiLineIntegerFile(BaseFileInterface):
-    readonly = True
 
     def sanitize_get(self, value):
         int_list = [int(val) for val in value.strip().split("\n") if val]
         return int_list
+
+    def sanitize_set(self, value):
+        if value is None:
+            value = -1
+        return int(value)
 
 
 class SplitValueFile(BaseFileInterface):
