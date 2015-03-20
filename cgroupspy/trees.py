@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
 
 from .nodes import Node, NodeControlGroup, NodeVM
-from .utils import walk_tree, split_path_components, mount
+from .utils import walk_tree, walk_up_tree, split_path_components, mount
 
 
 def bootstrap(root_path="/sys/fs/cgroup/", subsystems=None):
@@ -114,11 +114,18 @@ class BaseTree(object):
                 yield dir_name
 
     def walk(self, root=None):
-        """Walk through each each node - depth first"""
+        """Walk through each each node - pre-order depth-first"""
 
         if root is None:
             root = self.root
         return walk_tree(root)
+
+    def walk_up(self, root=None):
+        """Walk through each each node - post-order depth-first"""
+
+        if root is None:
+            root = self.root
+        return walk_up_tree(root)
 
 
 class Tree(BaseTree):
@@ -168,6 +175,11 @@ class GroupedTree(object):
         if root is None:
             root = self.control_root
         return walk_tree(root)
+
+    def walk_up(self, root=None):
+        if root is None:
+            root = self.control_root
+        return walk_up_tree(root)
 
     def get_node_by_name(self, pattern):
         for node in self.walk():

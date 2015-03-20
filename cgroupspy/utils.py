@@ -30,11 +30,21 @@ import ctypes
 
 
 def walk_tree(root):
+    """Pre-order depth-first"""
     yield root
 
     for child in root.children:
         for el in walk_tree(child):
             yield el
+
+
+def walk_up_tree(root):
+    """Post-order depth-first"""
+    for child in root.children:
+        for el in walk_up_tree(child):
+            yield el
+
+    yield root
 
 
 def get_device_major_minor(dev_path):
