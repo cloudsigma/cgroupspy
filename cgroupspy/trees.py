@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
 
 from .nodes import Node, NodeControlGroup, NodeVM
-from .utils import walk_tree, mount
+from .utils import walk_tree, split_path_components, mount
 
 
 def bootstrap(root_path="/sys/fs/cgroup/", subsystems=None):
@@ -57,9 +57,10 @@ class BaseTree(object):
 
     """ A basic cgroup node tree. An exact representation of the filesystem tree, provided by cgroups. """
 
-    def __init__(self, root_path="/sys/fs/cgroup/", groups=None):
+    def __init__(self, root_path="/sys/fs/cgroup/", groups=None, sub_groups=None):
         self.root_path = root_path
         self._groups = groups or []
+        self._sub_groups = sub_groups or []
         self.root = Node(root_path)
         self._build_tree()
 
@@ -69,16 +70,33 @@ class BaseTree(object):
 
     def _build_tree(self):
         """
-        Build a full or a partial tree, depending on the groups specified.
+        Build a full or a partial tree, depending on the groups/sub-groups specified.
         """
 
-        if self._groups:
-            for group in self._groups:
-                node = Node(name=group, parent=self.root)
-                self.root.children.append(node)
+        groups = self._groups or self.get_children_paths(self.root_path)
+        for group in groups:
+            node = Node(name=group, parent=self.root)
+            self.root.children.append(node)
+            self._init_sub_groups(node)
+
+    def _init_sub_groups(self, parent):
+        """
+        Initialise sub-groups, and create any that do not already exist.
+        """
+
+        if self._sub_groups:
+            for sub_group in self._sub_groups:
+                for component in split_path_components(sub_group):
+                    fp = os.path.join(parent.full_path, component)
+                    if os.path.exists(fp):
+                        node = Node(name=component, parent=parent)
+                        parent.children.append(node)
+                    else:
+                        node = parent.create_cgroup(component)
+                    parent = node
                 self._init_children(node)
         else:
-            self._init_children(self.root)
+            self._init_children(parent)
 
     def _init_children(self, parent):
         """
@@ -119,9 +137,9 @@ class GroupedTree(object):
 
     """
 
-    def __init__(self, root_path="/sys/fs/cgroup", groups=None):
+    def __init__(self, root_path="/sys/fs/cgroup", groups=None, sub_groups=None):
 
-        self.node_tree = BaseTree(root_path=root_path, groups=groups)
+        self.node_tree = BaseTree(root_path=root_path, groups=groups, sub_groups=sub_groups)
         self.control_root = NodeControlGroup(name="cgroup")
         for ctrl in self.node_tree.root.children:
             self.control_root.add_node(ctrl)

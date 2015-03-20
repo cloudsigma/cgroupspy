@@ -48,6 +48,20 @@ def get_device_major_minor(dev_path):
     return os.major(stat.st_rdev), os.minor(stat.st_rdev)
 
 
+def split_path_components(path):
+    components=[]
+    while True:
+        path, component = os.path.split(path)
+        if component != "":
+             components.append(component)
+        else:
+            if path != "":
+                components.append(path)
+            break
+    components.reverse()
+    return components
+
+
 def mount(source, target, fs, options=""):
     ret = ctypes.CDLL("libc.so.6", use_errno=True).mount(source, target, fs, 0, options)
     if ret < 0:
