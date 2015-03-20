@@ -27,7 +27,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
 
 from .nodes import Node, NodeControlGroup, NodeVM
-from .utils import walk_tree
+from .utils import walk_tree, mount
+
+
+def bootstrap(root_path="/sys/fs/cgroup/", subsystems=None):
+    if not os.path.ismount(root_path):
+        if not os.path.isdir(root_path):
+            os.makedirs(root_path)
+        try:
+            mount("cgroup_root", root_path, "tmpfs")
+        except RuntimeError:
+            os.rmdir(root_path)
+            raise
+    if subsystems is None:
+        subsystems = Node.CONTROLLERS.keys()
+    for subsystem in subsystems:
+        path = root_path+subsystem
+        if not os.path.ismount(path):
+            if not os.path.isdir(path):
+                os.makedirs(path)
+            try:
+                mount(subsystem, path, "cgroup", subsystem)
+            except RuntimeError:
+                os.rmdir(path)
+                raise
 
 
 class BaseTree(object):
