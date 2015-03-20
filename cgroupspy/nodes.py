@@ -139,16 +139,16 @@ class Node(object):
     def delete_cgroup(self, name):
         """
         Delete a cgroup by name and detach it from this node.
+        Raises OSError if the cgroup is not empty.
         """
+        fp = os.path.join(self.full_path, name)
+        if os.path.exists(fp):
+            os.rmdir(fp)
         node = Node(name, parent=self)
         try:
             self.children.remove(node)
         except ValueError:
             return
-        else:
-            fp = os.path.join(self.full_path, name)
-            if os.path.exists(fp):
-                os.rmdir(fp)
 
     def walk(self):
         """Walk through this node and its children - pre-order depth-first"""
