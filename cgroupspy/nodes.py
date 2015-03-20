@@ -30,7 +30,7 @@ import os
 
 from .controllers import CpuAcctController, CpuController, CpuSetController, MemoryController, DevicesController, \
     BlkIOController, NetClsController, NetPrioController
-from .utils import walk_tree
+from .utils import walk_tree, walk_up_tree
 
 
 LOG = logging.getLogger(__name__)
@@ -149,6 +149,14 @@ class Node(object):
             fp = os.path.join(self.full_path, name)
             if os.path.exists(fp):
                 os.rmdir(fp)
+
+    def walk(self):
+        """Walk through this node and its children - pre-order depth-first"""
+        return walk_tree(self)
+
+    def walk_up(self):
+        """Walk through this node and its children - post-order depth-first"""
+        return walk_up_tree(self)
 
 
 class NodeControlGroup(object):
