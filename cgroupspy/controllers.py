@@ -38,6 +38,7 @@ class Controller(object):
     """
 
     tasks = MultiLineIntegerFile("tasks")
+    procs = MultiLineIntegerFile("cgroup.procs")
     notify_on_release = FlagFile("notify_on_release")
     clone_children = FlagFile("cgroup.clone_children")
 
@@ -79,7 +80,7 @@ class CpuController(Controller):
     rt_period_us = IntegerFile("cpu.rt_period_us")
     rt_runtime_us = IntegerFile("cpu.rt_runtime_us")
     shares = IntegerFile("cpu.shares")
-    stat = DictFile("cpu.stat")
+    stat = DictFile("cpu.stat", readonly=True)
 
 
 class CpuAcctController(Controller):
@@ -89,9 +90,9 @@ class CpuAcctController(Controller):
     cpuacct.usage
     cpuacct.usage_percpu
     """
-    acct_stat = DictFile("cpuacct.stat")
+    acct_stat = DictFile("cpuacct.stat", readonly=True)
     usage = IntegerFile("cpuacct.usage")
-    usage_percpu = IntegerListFile("cpuacct.usage_percpu")
+    usage_percpu = IntegerListFile("cpuacct.usage_percpu", readonly=True)
 
 
 class CpuSetController(Controller):
@@ -166,7 +167,7 @@ class MemoryController(Controller):
     memsw_max_usage_in_bytes = IntegerFile("memory.memsw.max_usage_in_bytes")
     swappiness = IntegerFile("memory.swappiness")
 
-    stat = DictFile("memory.stat")
+    stat = DictFile("memory.stat", readonly=True)
 
     use_hierarchy = FlagFile("memory.use_hierarchy")
     force_empty = FlagFile("memory.force_empty")
@@ -251,3 +252,21 @@ class BlkIOController(Controller):
     # time_recursive =
     weight = IntegerFile("blkio.weight")
     # weight_device =
+
+
+class NetClsController(Controller):
+
+    """
+    net_cls.classid
+    """
+    class_id = IntegerFile("net_cls.classid")
+
+
+class NetPrioController(Controller):
+
+    """
+    net_prio.prioidx
+    net_prio.ifpriomap
+    """
+    prioidx = IntegerFile("net_prio.prioidx", readonly=True)
+    ifpriomap = DictFile("netprio.ifpriomap")

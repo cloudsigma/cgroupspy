@@ -29,8 +29,8 @@ import logging
 import os
 
 from .controllers import CpuAcctController, CpuController, CpuSetController, MemoryController, DevicesController, \
-    BlkIOController
-from .utils import walk_tree
+    BlkIOController, NetClsController, NetPrioController
+from .utils import walk_tree, walk_up_tree
 
 
 LOG = logging.getLogger(__name__)
@@ -55,6 +55,8 @@ class Node(object):
         "cpuacct": CpuAcctController,
         "devices": DevicesController,
         "blkio": BlkIOController,
+        "net_cls": NetClsController,
+        "net_prio": NetPrioController,
     }
 
     def __init__(self, name, parent=None):
@@ -137,16 +139,36 @@ class Node(object):
     def delete_cgroup(self, name):
         """
         Delete a cgroup by name and detach it from this node.
+        Raises OSError if the cgroup is not empty.
         """
+        fp = os.path.join(self.full_path, name)
+        if os.path.exists(fp):
+            os.rmdir(fp)
         node = Node(name, parent=self)
         try:
             self.children.remove(node)
         except ValueError:
             return
-        else:
-            fp = os.path.join(self.full_path, name)
-            if os.path.exists(fp):
-                os.rmdir(fp)
+
+    def delete_empty_children(self):
+        """
+        Walk through the children of this node and delete any that are empty.
+        """
+        for child in self.children:
+            child.delete_empty_children()
+            try:
+                if os.path.exists(child.full_path):
+                    os.rmdir(child.full_path)
+            except OSError: pass
+            else: self.children.remove(child)
+
+    def walk(self):
+        """Walk through this node and its children - pre-order depth-first"""
+        return walk_tree(self)
+
+    def walk_up(self):
+        """Walk through this node and its children - post-order depth-first"""
+        return walk_up_tree(self)
 
 
 class NodeControlGroup(object):

@@ -26,13 +26,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import os
 
+import ctypes
+
 
 def walk_tree(root):
+    """Pre-order depth-first"""
     yield root
 
     for child in root.children:
         for el in walk_tree(child):
             yield el
+
+
+def walk_up_tree(root):
+    """Post-order depth-first"""
+    for child in root.children:
+        for el in walk_up_tree(child):
+            yield el
+
+    yield root
 
 
 def get_device_major_minor(dev_path):
@@ -44,3 +56,25 @@ def get_device_major_minor(dev_path):
     """
     stat = os.lstat(dev_path)
     return os.major(stat.st_rdev), os.minor(stat.st_rdev)
+
+
+def split_path_components(path):
+    components=[]
+    while True:
+        path, component = os.path.split(path)
+        if component != "":
+             components.append(component)
+        else:
+            if path != "":
+                components.append(path)
+            break
+    components.reverse()
+    return components
+
+
+def mount(source, target, fs, options=""):
+    ret = ctypes.CDLL("libc.so.6", use_errno=True).mount(source, target, fs, 0, options)
+    if ret < 0:
+        errno = ctypes.get_errno()
+        raise RuntimeError("Error mounting {} ({}) on {} with options '{}': {}".
+          format(source, fs, target, options, os.strerror(errno)))
