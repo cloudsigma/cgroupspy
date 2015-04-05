@@ -90,7 +90,7 @@ Another example with the VMTree - for managing libvirt guests
  <NodeControlGroup emulator>]
 >>> print vm.path
 /machine/grey/1ce10f47-fb4e-4b6a-8ee6-ba34940cdda7.libvirt-qemu
->>> vcpu1 =vm.children[0]
+>>> vcpu1 = vm.children[0]
 >>> print vcpu1.cpuset.cpus
 {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 
