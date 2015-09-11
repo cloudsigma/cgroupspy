@@ -79,6 +79,26 @@ class FlagFile(BaseFileInterface):
         return int(bool(value))
 
 
+class BitFieldFile(BaseFileInterface):
+
+    """
+    Example: '2' becomes [False, True, False, False, False, False, False, False]
+    """
+
+    def sanitize_get(self, value):
+        v = int(value)
+        # Calculate the length of the value in bits by converting to hex
+        l = (len(hex(v)) - 2) * 4
+        # Increase length to the next multiple of 8
+        l += (7 - (l-1)%8)
+        return [bool((v >> i) & 1) for i in range(l)]
+
+    def sanitize_set(self, value):
+        if isinstance(value, basestring) or not isinstance(value, Iterable):
+            return int(value)
+        return sum((int(bool(value[i])) << i) for i in range(len(value)))
+
+
 class IntegerFile(BaseFileInterface):
 
     """

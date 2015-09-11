@@ -28,8 +28,8 @@ from unittest import TestCase
 
 import mock
 
-from ..interfaces import BaseFileInterface, FlagFile, CommaDashSetFile, DictFile, IntegerFile, IntegerListFile, \
-    ListFile, MultiLineIntegerFile
+from ..interfaces import BaseFileInterface, FlagFile, BitFieldFile, CommaDashSetFile, DictFile, \
+    IntegerFile, IntegerListFile, ListFile, MultiLineIntegerFile
 
 
 class FaceHolder(object):
@@ -78,6 +78,19 @@ class InterfacesTest(TestCase):
         fh.face = 1
         self.assertEqual(fh.face, True)
         self.assertEqual(fh.val, "1")
+
+    def test_bitfieldfile(self):
+        self.patch_face(face=BitFieldFile("bitfieldfile"))
+        fh = FaceHolder("2")
+        self.assertEqual(fh.face, [False, True, False, False, False, False, False, False])
+
+        fh.face = [False]
+        self.assertEqual(fh.face, [False, False, False, False, False, False, False, False])
+        self.assertEqual(fh.val, "0")
+
+        fh.face = [False, True, True]
+        self.assertEqual(fh.face, [False, True, True, False, False, False, False, False])
+        self.assertEqual(fh.val, "6")
 
     def test_comma_dash(self):
         self.patch_face(face=CommaDashSetFile("commadash"))
