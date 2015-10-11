@@ -30,12 +30,12 @@ from .nodes import Node, NodeControlGroup, NodeVM
 from .utils import walk_tree, walk_up_tree, split_path_components, mount
 
 
-def bootstrap(root_path="/sys/fs/cgroup/", subsystems=None):
+def bootstrap(root_path=b"/sys/fs/cgroup/", subsystems=None):
     if not os.path.ismount(root_path):
         if not os.path.isdir(root_path):
             os.makedirs(root_path)
         try:
-            mount("cgroup_root", root_path, "tmpfs")
+            mount(b"cgroup_root", root_path, b"tmpfs")
         except RuntimeError:
             os.rmdir(root_path)
             raise
@@ -47,7 +47,7 @@ def bootstrap(root_path="/sys/fs/cgroup/", subsystems=None):
             if not os.path.isdir(path):
                 os.makedirs(path)
             try:
-                mount(subsystem, path, "cgroup", subsystem)
+                mount(subsystem, path, b"cgroup", subsystem)
             except RuntimeError:
                 os.rmdir(path)
                 raise
@@ -130,7 +130,11 @@ class BaseTree(object):
 
 class Tree(BaseTree):
     def get_node_by_path(self, path):
-        path = path.rstrip("/")
+        try:
+            path = path.encode()
+        except AttributeError:
+            pass
+        path = path.rstrip(b"/")
         for node in self.walk():
             if node.path == path:
                 return node
@@ -144,10 +148,10 @@ class GroupedTree(object):
 
     """
 
-    def __init__(self, root_path="/sys/fs/cgroup", groups=None, sub_groups=None):
+    def __init__(self, root_path=b"/sys/fs/cgroup", groups=None, sub_groups=None):
 
         self.node_tree = BaseTree(root_path=root_path, groups=groups, sub_groups=sub_groups)
-        self.control_root = NodeControlGroup(name="cgroup")
+        self.control_root = NodeControlGroup(name=b"cgroup")
         for ctrl in self.node_tree.root.children:
             self.control_root.add_node(ctrl)
 
@@ -182,11 +186,19 @@ class GroupedTree(object):
         return walk_up_tree(root)
 
     def get_node_by_name(self, pattern):
+        try:
+            pattern = pattern.encode()
+        except AttributeError:
+            pass
         for node in self.walk():
             if pattern in node.name:
                 return node
 
     def get_node_by_path(self, path):
+        try:
+            path = path.encode()
+        except AttributeError:
+            pass
         for node in self.walk():
             if path == node.path:
                 return node
@@ -199,11 +211,11 @@ class VMTree(GroupedTree):
         super(VMTree, self).__init__(*args, **kwargs)
 
     def _create_node(self, name, parent):
-        if "libvirt-qemu" in name or parent.name == "qemu":
+        if b"libvirt-qemu" in name or parent.name == b"qemu":
             vm_node = NodeVM(name, parent=parent)
             self.vms[name] = vm_node
             return vm_node
         return super(VMTree, self)._create_node(name, parent=parent)
 
     def get_vm_node(self, name):
-        return self.vms.get('{}.libvirt-qemu'.format(name))
+        return self.vms.get(b'%s.libvirt-qemu' % (name))

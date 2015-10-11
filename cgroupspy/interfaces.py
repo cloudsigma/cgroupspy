@@ -38,22 +38,25 @@ class BaseFileInterface(object):
 
     def __init__(self, filename, readonly=None, writeonly=None):
         if readonly and writeonly:
-            raise Exception("This interface cannot be both readonly and writeonly")
+            raise RuntimeError("This interface cannot be both readonly and writeonly")
 
-        self.filename = filename
+        try:
+            self.filename = filename.encode()
+        except AttributeError:
+            self.filename = filename
         self.readonly = readonly or self.readonly
         self.writeonly = writeonly or self.writeonly
 
     def __get__(self, instance, owner):
         if self.writeonly:
-            raise Exception("This interface is writeonly")
+            raise RuntimeError("This interface is writeonly")
 
         value = instance.get_property(self.filename)
         return self.sanitize_get(value)
 
     def __set__(self, instance, value):
         if self.readonly:
-            raise Exception("This interface is readonly")
+            raise RuntimeError("This interface is readonly")
 
         value = self.sanitize_set(value)
         if value is not None:
@@ -94,7 +97,11 @@ class BitFieldFile(BaseFileInterface):
         return [bool((v >> i) & 1) for i in range(l)]
 
     def sanitize_set(self, value):
-        if isinstance(value, basestring) or not isinstance(value, Iterable):
+        try:
+            value = value.encode()
+        except AttributeError:
+            pass
+        if isinstance(value, bytes) or not isinstance(value, Iterable):
             return int(value)
         return sum((int(bool(value[i])) << i) for i in range(len(value)))
 
@@ -128,7 +135,7 @@ class DictFile(BaseFileInterface):
 
     def sanitize_set(self, value):
         if not isinstance(value, dict):
-            raise Exception("Value {} must be a dict".format(value))
+            raise ValueError("Value {} must be a dict".format(value))
         return ",".join(str(x) for x in value)
 
 
@@ -147,7 +154,7 @@ class IntegerListFile(ListFile):
 
     def sanitize_get(self, value):
         value_list = super(IntegerListFile, self).sanitize_get(value)
-        return map(int, value_list)
+        return list(map(int, value_list))
 
     def sanitize_set(self, value):
         if value is None:
@@ -167,14 +174,18 @@ class CommaDashSetFile(BaseFileInterface):
         for el_group in value.strip().split(','):
             if "-" in el_group:
                 start, end = el_group.split("-")
-                for el in xrange(int(start), int(end) + 1):
+                for el in range(int(start), int(end) + 1):
                     elems.append(el)
             else:
                 elems.append(int(el_group))
         return set(elems)
 
     def sanitize_set(self, value):
-        if isinstance(value, basestring) or not isinstance(value, Iterable):
+        try:
+            value = value.encode()
+        except AttributeError:
+            pass
+        if isinstance(value, bytes) or not isinstance(value, Iterable):
             value = [str(value)]
         return ",".join(str(x) for x in value)
 
@@ -214,8 +225,8 @@ class TypedFile(BaseFileInterface):
 
     def __init__(self, filename, contenttype, readonly=None, writeonly=None, many=False):
         if not issubclass(contenttype, BaseContentType):
-            raise Exception("Contenttype should be a class inheriting "
-                            "from BaseContentType, not {}".format(contenttype))
+            raise RuntimeError("Contenttype should be a class inheriting "
+                               "from BaseContentType, not {}".format(contenttype))
 
         self.contenttype = contenttype
         self.many = many

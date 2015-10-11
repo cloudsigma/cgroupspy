@@ -42,27 +42,34 @@ class Node(object):
     Basic cgroup tree node. Provides means to link it to a parent and set a controller, depending on the cgroup the node
     exists in.
     """
-    NODE_ROOT = "root"
-    NODE_CONTROLLER_ROOT = "controller_root"
-    NODE_SLICE = "slice"
-    NODE_SCOPE = "scope"
-    NODE_CGROUP = "cgroup"
+    NODE_ROOT = b"root"
+    NODE_CONTROLLER_ROOT = b"controller_root"
+    NODE_SLICE = b"slice"
+    NODE_SCOPE = b"scope"
+    NODE_CGROUP = b"cgroup"
 
     CONTROLLERS = {
-        "memory": MemoryController,
-        "cpuset": CpuSetController,
-        "cpu": CpuController,
-        "cpuacct": CpuAcctController,
-        "devices": DevicesController,
-        "blkio": BlkIOController,
-        "net_cls": NetClsController,
-        "net_prio": NetPrioController,
+        b"memory": MemoryController,
+        b"cpuset": CpuSetController,
+        b"cpu": CpuController,
+        b"cpuacct": CpuAcctController,
+        b"devices": DevicesController,
+        b"blkio": BlkIOController,
+        b"net_cls": NetClsController,
+        b"net_prio": NetPrioController,
     }
 
     def __init__(self, name, parent=None):
+        try:
+            name = name.encode()
+        except AttributeError:
+            pass
         self.name = name
-        self.verbose_name = name.decode("unicode_escape")
-        self.parent = parent
+        self.verbose_name = name
+        try:
+            self.parent = parent.encode()
+        except AttributeError:
+            self.parent = parent
         self.children = []
         self.node_type = self._get_node_type()
         self.controller_type = self._get_controller_type()
@@ -74,7 +81,7 @@ class Node(object):
         return False
 
     def __repr__(self):
-        return "<{} {}>".format(self.__class__.__name__, self.path)
+        return "<{} {}>".format(self.__class__.__name__, self.path.decode())
 
     @property
     def full_path(self):
@@ -89,8 +96,12 @@ class Node(object):
         """Node's relative path from the root node"""
 
         if self.parent:
-            return os.path.join(self.parent.path, self.name)
-        return "/"
+            try:
+                parent_path = self.parent.path.encode()
+            except AttributeError:
+                parent_path = self.parent.path
+            return os.path.join(parent_path, self.name)
+        return b"/"
 
     def _get_node_type(self):
         """Returns the current node's type"""
@@ -99,9 +110,9 @@ class Node(object):
             return self.NODE_ROOT
         elif self.parent.node_type == self.NODE_ROOT:
             return self.NODE_CONTROLLER_ROOT
-        elif ".slice" in self.name or '.partition' in self.name:
+        elif b".slice" in self.name or b'.partition' in self.name:
             return self.NODE_SLICE
-        elif ".scope" in self.name:
+        elif b".scope" in self.name:
             return self.NODE_SCOPE
         else:
             return self.NODE_CGROUP
@@ -129,7 +140,7 @@ class Node(object):
         """
         node = Node(name, parent=self)
         if node in self.children:
-            raise Exception('Node {} already exists under {}'.format(name, self.path))
+            raise RuntimeError('Node {} already exists under {}'.format(name, self.path))
 
         fp = os.path.join(self.full_path, name)
         os.mkdir(fp)
@@ -198,17 +209,17 @@ class NodeControlGroup(object):
     def path(self):
         if self.parent:
             base_name, ext = os.path.splitext(self.name)
-            if ext not in ['.slice', '.scope', '.partition']:
+            if ext not in [b'.slice', b'.scope', b'.partition']:
                 base_name = self.name
             return os.path.join(self.parent.path, base_name)
-        return "/"
+        return b"/"
 
     def add_node(self, node):
         """
         A a Node object to the group. Only one node per cgroup is supported
         """
         if self.controllers.get(node.controller_type, None):
-            raise Exception("Cannot add node {} to the node group. A node for {} group is already assigned".format(
+            raise RuntimeError("Cannot add node {} to the node group. A node for {} group is already assigned".format(
                 node,
                 node.controller_type
             ))
@@ -218,7 +229,7 @@ class NodeControlGroup(object):
             setattr(self, node.controller_type, node.controller)
 
     def __repr__(self):
-        return "<{} {}>".format(self.__class__.__name__, self.name)
+        return "<{} {}>".format(self.__class__.__name__, self.name.decode())
 
     @property
     def children(self):
