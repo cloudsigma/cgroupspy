@@ -103,9 +103,13 @@ class InterfacesTest(TestCase):
         self.assertEqual(fh.face, {1, 2, 3})
         self.assertEqual(fh.val, "1,2,3")
 
-        fh.face = 1
+        fh.face = {1}
         self.assertEqual(fh.face, {1})
         self.assertEqual(fh.val, "1")
+
+        fh.face = {}
+        self.assertEqual(fh.face, set([]))
+        self.assertEqual(fh.val, " ")
 
     def test_dict_file(self):
         self.patch_face(face=DictFile("dictfile"))

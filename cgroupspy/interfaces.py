@@ -177,10 +177,13 @@ class CommaDashSetFile(BaseFileInterface):
                 for el in range(int(start), int(end) + 1):
                     elems.append(el)
             else:
-                elems.append(int(el_group))
+                if el_group != '':
+                    elems.append(int(el_group))
         return set(elems)
 
     def sanitize_set(self, value):
+        if len(value) == 0:
+            return ' '
         try:
             value = value.encode()
         except AttributeError:
