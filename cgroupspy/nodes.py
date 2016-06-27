@@ -142,6 +142,7 @@ class Node(object):
         if node in self.children:
             raise RuntimeError('Node {} already exists under {}'.format(name, self.path))
 
+        name = name.encode()
         fp = os.path.join(self.full_path, name)
         os.mkdir(fp)
         self.children.append(node)
