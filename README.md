@@ -35,7 +35,7 @@ Example usage
 <Node />
 
 # And the root has children
->>> print t.root.children
+>>> print(t.root.children)
 [<Node /hugetlb>, <Node /net_prio>, <Node /perf_event>, <Node /blkio>, <Node /net_cls>, <Node /freezer>, <Node /devices>, <Node /memory>, <Node /cpuacct>, <Node /cpu>, <Node /cpuset>, <Node /systemd>, <Node /cgmanager>]
 
 # You can for example get the cpuset
@@ -72,31 +72,31 @@ Another example with the VMTree - for managing libvirt guests
 ```python
 >>> from cgroupspy.trees import VMTree
 >>> vmt = VMTree()
->>> print vmt.vms
+>>> print(vmt.vms)
 {u'1ce10f47-fb4e-4b6a-8ee6-ba34940cdda7.libvirt-qemu': <NodeVM 1ce10f47-fb4e-4b6a-8ee6-ba34940cdda7.libvirt-qemu>,
  u'3d5013b9-93ed-4ef1-b518-a2cea43f69ad.libvirt-qemu': <NodeVM 3d5013b9-93ed-4ef1-b518-a2cea43f69ad.libvirt-qemu>,
 }
 
 >>> vm = vmt.get_vm_node("1ce10f47-fb4e-4b6a-8ee6-ba34940cdda7")
->>> print vm.cpu.shares
+>>> print(vm.cpu.shares)
 1024
->>> print vm.cpuset.cpus
+>>> print(vm.cpuset.cpus)
 {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
->>> print vm.memory.limit_in_bytes
+>>> print(vm.memory.limit_in_bytes)
 25603080192
->>> print vm.children
+>>> print(vm.children)
 [<NodeControlGroup vcpu1>,
  <NodeControlGroup vcpu0>,
  <NodeControlGroup emulator>]
->>> print vm.path
+>>> print(vm.path)
 /machine/grey/1ce10f47-fb4e-4b6a-8ee6-ba34940cdda7.libvirt-qemu
 >>> vcpu1 = vm.children[0]
->>> print vcpu1.cpuset.cpus
+>>> print(vcpu1.cpuset.cpus)
 {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 
 >>> vcpu1.cpuset.cpus = {1,2,3}
 
->>> print vcpu1.cpuset.cpus
+>>> print(vcpu1.cpuset.cpus)
 {1, 2, 3}
 ```
 
