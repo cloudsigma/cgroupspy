@@ -153,6 +153,7 @@ class Node(object):
         Delete a cgroup by name and detach it from this node.
         Raises OSError if the cgroup is not empty.
         """
+        name = name.encode()
         fp = os.path.join(self.full_path, name)
         if os.path.exists(fp):
             os.rmdir(fp)
