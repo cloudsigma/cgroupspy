@@ -160,7 +160,7 @@ class MemoryController(Controller):
     limit_in_bytes = IntegerFile("memory.limit_in_bytes")
     soft_limit_in_bytes = IntegerFile("memory.soft_limit_in_bytes")
     usage_in_bytes = IntegerFile("memory.usage_in_bytes")
-    max_usage_in_bytes = IntegerFile("memory.limit_in_bytes")
+    max_usage_in_bytes = IntegerFile("memory.max_usage_in_bytes")
 
     memsw_limit_in_bytes = IntegerFile("memory.memsw.limit_in_bytes")
     memsw_usage_in_bytes = IntegerFile("memory.memsw.usage_in_bytes")
