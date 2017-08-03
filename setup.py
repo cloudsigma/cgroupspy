@@ -16,8 +16,8 @@ setup(
     tests_require=['mock', 'nose>=1.3'],
     author='CloudSigma AG',
     author_email='dev-support@cloudsigma.com',
-    maintainer='Ivelin Slavov',
-    maintainer_email='ivelin.slavov@cloudsigma.com',
+    maintainer='Miguel Trujillo',
+    maintainer_email='miguel@cloudsigma.com',
     url='https://github.com/cloudsigma/cgroupspy',
     keywords=[
         'cgroups',
