@@ -1,7 +1,19 @@
 language: python
+dist: trusty
 python:
-  - "2.7"
+  - 2.7
+  - 3.6
 
+matrix:
+  include:
+    - python: 3.7
+      dist: xenial
+      sudo: required  # https://github.com/travis-ci/travis-ci/issues/9815#issuecomment-401805885
+    - python: nightly
+      dist: xenial
+      sudo: required
+  allow_failures:
+    python: nightly
 
 # command to install dependencies
 install:
