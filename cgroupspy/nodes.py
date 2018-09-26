@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import logging
 
+import errno
 import os
 
 from .controllers import CpuAcctController, CpuController, CpuSetController, MemoryController, DevicesController, \
@@ -144,7 +145,12 @@ class Node(object):
 
         name = name.encode()
         fp = os.path.join(self.full_path, name)
-        os.mkdir(fp)
+        try:
+            os.mkdir(fp)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
         self.children.append(node)
         return node
 
