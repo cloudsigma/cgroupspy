@@ -186,14 +186,58 @@ class CommaDashSetFile(BaseFileInterface):
     def sanitize_set(self, value):
         if len(value) == 0:
             return ' '
+
         try:
-            value = value.encode()
+            value = value.decode()
         except AttributeError:
             pass
-        if isinstance(value, bytes) or not isinstance(value, Iterable):
-            value = [str(value)]
-        return ",".join(str(x) for x in value)
 
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return ' '
+            value = value.split(',')
+
+        if isinstance(value, Iterable):
+            value = set(value)
+        else:
+            raise ValueError("Value {} must be a sequence of int".format(value))
+
+        for k in value:
+            if not isinstance(k, int):
+                raise ValueError("Value {} must be a sequence of int".format(value))
+
+        value = sorted(list(value))
+        index = [i for i in range(len(value))]
+        for i in range(len(value)):
+            if index[i] != i:
+                continue
+
+            j = i
+
+            while j < len(value) - 1:
+                if value[j] + 1 == value[j + 1]:
+                    index[j + 1] = i
+                    j += 1
+                else:
+                    break
+
+        parts = []
+        for i in range(len(value)):
+            if i > 0 and index[i - 1] == index[i]:
+                continue
+
+            j = i
+
+            while j + 1 < len(value) and index[j + 1] == index[j]:
+                j += 1
+
+            if i == j:
+                parts.append(str(value[i]))
+            else:
+                parts.append('{}-{}'.format(value[i], value[j]))
+
+        return ','.join(parts)
 
 class MultiLineIntegerFile(BaseFileInterface):
 
