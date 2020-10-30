@@ -24,33 +24,24 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-import tempfile
-from unittest import TestCase
-from collections import namedtuple
-
-import os
-
-from ..controllers import Controller
+from cgroupspy.utils import split_path_components
 
 
-class TestControllers(TestCase):
+def check__split_path_components_case(path, components):
+    assert split_path_components(path) == components
 
-    @classmethod
-    def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp()
-        node_class = namedtuple("node", "full_path")
-        cls.node = node_class(cls.tmp)
 
-    def test_controller_filepath(self):
-        ctl = Controller(self.node)
-        res = ctl.filepath("blah")
-        self.assertEqual(res, os.path.join(self.tmp, "blah"))
+def test_split_path_components():
+    pairs = [
+        ('', []),
+        ('/', []),
+        ('a/b/c', ['a', 'b', 'c']),
+        ('a/b/c/', ['a', 'b', 'c']),
+        ('/a/b/c', ['a', 'b', 'c']),
+        ('/a/b/c/', ['a', 'b', 'c']),
+        (b'/', []),
+        (b'/a/b/c', ['a', 'b', 'c']),
+    ]
 
-    def test_controller_funcs(self):
-        ctl = Controller(self.node)
-        val = "123"
-        ctl.set_property("bostan", val)
-        saved = ctl.get_property("bostan")
-        self.assertEqual(saved, val)
-        self.assertIsNotNone(ctl.get_interface('tasks'))
-        self.assertIsNone(ctl.get_interface('bostan'))
+    for path, components in pairs:
+        yield check__split_path_components_case, path, components
