@@ -239,6 +239,7 @@ class CommaDashSetFile(BaseFileInterface):
 
         return ','.join(parts)
 
+
 class MultiLineIntegerFile(BaseFileInterface):
 
     def sanitize_get(self, value):
@@ -288,17 +289,33 @@ class TypedFile(BaseFileInterface):
 
     def sanitize_set(self, value):
         if isinstance(value, self.contenttype):
-            return value
+            return str(value)
 
-        return self.contenttype.from_string(value)
+        if self.many:
+            items = []
+            for entry in value:
+                if isinstance(entry, str):
+                    entry = entry.strip()
+                    if not entry:
+                        continue
+                    items.append(str(self.contenttype.from_string(entry)))
+                else:
+                    items.append(str(entry))
+            return "\n".join(items)
+        else:
+            return str(self.contenttype.from_string(value))
 
     def sanitize_get(self, value):
-        res = [self.contenttype.from_string(val) for val in value.split("\n") if val]
-        if not self.many:
-            if res:
-                return res[0]
-            return None
-        return res
+        if self.many:
+            result = []
+            for line in value.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                result.append(self.contenttype.from_string(line))
+            return result
+
+        return self.contenttype.from_string(value)
 
 
 class DictOrFlagFile(BaseFileInterface):
