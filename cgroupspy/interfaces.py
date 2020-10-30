@@ -93,7 +93,7 @@ class BitFieldFile(BaseFileInterface):
         # Calculate the length of the value in bits by converting to hex
         length = (len(hex(v)) - 2) * 4
         # Increase length to the next multiple of 8
-        length += (7 - (length-1) % 8)
+        length += (7 - (length - 1) % 8)
         return [bool((v >> i) & 1) for i in range(length)]
 
     def sanitize_set(self, value):
@@ -125,7 +125,6 @@ class IntegerFile(BaseFileInterface):
 
 
 class DictFile(BaseFileInterface):
-
     def sanitize_get(self, value):
         res = {}
         for el in value.split("\n"):
@@ -136,7 +135,9 @@ class DictFile(BaseFileInterface):
     def sanitize_set(self, value):
         if not isinstance(value, dict):
             raise ValueError("Value {} must be a dict".format(value))
-        return ",".join(str(x) for x in value)
+
+        keys = sorted(value.keys())
+        return "\n".join("{} {}".format(k, value[k]) for k in keys)
 
 
 class ListFile(BaseFileInterface):
@@ -158,8 +159,9 @@ class IntegerListFile(ListFile):
 
     def sanitize_set(self, value):
         if value is None:
-            value = -1
-        return int(value)
+            value = '-1'
+
+        return " ".join([str(v) for v in value])
 
 
 class CommaDashSetFile(BaseFileInterface):
@@ -201,8 +203,9 @@ class MultiLineIntegerFile(BaseFileInterface):
 
     def sanitize_set(self, value):
         if value is None:
-            value = -1
-        return int(value)
+            return '-1'
+
+        return '\n'.join(str(x) for x in value)
 
 
 class SplitValueFile(BaseFileInterface):
