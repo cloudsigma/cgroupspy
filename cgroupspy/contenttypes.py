@@ -127,6 +127,7 @@ class DeviceThrottle(BaseContentType):
 
     def __init__(self, limit, major=None, minor=None, ):
         self.limit = limit
+
         if major is not None and major != '*':
             self.major = int(major)
         else:
@@ -145,9 +146,6 @@ class DeviceThrottle(BaseContentType):
 
     @classmethod
     def from_string(cls, value):
-        if not value:
-            return None
-
         try:
             major_minor, limit = value.split()
             major, minor = major_minor.split(":")
