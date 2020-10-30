@@ -270,4 +270,4 @@ class NetPrioController(Controller):
     net_prio.ifpriomap
     """
     prioidx = IntegerFile("net_prio.prioidx", readonly=True)
-    ifpriomap = DictFile("netprio.ifpriomap")
+    ifpriomap = DictFile("net_prio.ifpriomap")
