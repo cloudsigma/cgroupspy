@@ -30,7 +30,7 @@ import mock
 
 from ..contenttypes import DeviceAccess, DeviceThrottle
 from ..interfaces import BaseFileInterface, FlagFile, BitFieldFile, CommaDashSetFile, DictFile, \
-    IntegerFile, IntegerListFile, ListFile, MultiLineIntegerFile
+    IntegerFile, IntegerListFile, ListFile, MultiLineIntegerFile, TypedFile
 
 
 class FaceHolder(object):
