@@ -26,8 +26,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import os
 
-import ctypes
-
 
 def walk_tree(root):
     """Pre-order depth-first"""
@@ -47,17 +45,6 @@ def walk_up_tree(root):
     yield root
 
 
-def get_device_major_minor(dev_path):
-    """
-    Returns the device (major, minor) tuple for simplicity
-    :param dev_path: Path to the device
-    :return: (device major, device minor)
-    :rtype: (int, int)
-    """
-    stat = os.lstat(dev_path)
-    return os.major(stat.st_rdev), os.minor(stat.st_rdev)
-
-
 def split_path_components(path):
     components = []
     while True:
@@ -70,11 +57,3 @@ def split_path_components(path):
             break
     components.reverse()
     return components
-
-
-def mount(source, target, fs, options=""):
-    ret = ctypes.CDLL("libc.so.6", use_errno=True).mount(source, target, fs, 0, options)
-    if ret < 0:
-        errno = ctypes.get_errno()
-        raise RuntimeError("Error mounting {} ({}) on {} with options '{}': {}".
-                           format(source, fs, target, options, os.strerror(errno)))
