@@ -169,15 +169,19 @@ class Node(object):
         """
         Walk through the children of this node and delete any that are empty.
         """
+        removed_children = []
+
         for child in self.children:
             child.delete_empty_children()
             try:
                 if os.path.exists(child.full_path):
                     os.rmdir(child.full_path)
+                    removed_children.append(child)
             except OSError:
                 pass
-            else:
-                self.children.remove(child)
+
+        for child in removed_children:
+            self.children.remove(child)
 
     def walk(self):
         """Walk through this node and its children - pre-order depth-first"""
