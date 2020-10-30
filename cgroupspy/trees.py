@@ -57,7 +57,18 @@ class BaseTree(object):
 
     """ A basic cgroup node tree. An exact representation of the filesystem tree, provided by cgroups. """
 
-    def __init__(self, root_path="/sys/fs/cgroup/", groups=None, sub_groups=None):
+    def __init__(self, root_path=b"/sys/fs/cgroup/", groups=None, sub_groups=None):
+        """
+        Construct a basic cgroup node tree. An exact representation of the filesystem tree, provided by cgroups.
+
+        :param root_path: str -> The path of the root folder containing the cgroups. By default it is /sys/fs/cgroup/
+        :param groups: None | list -> Use only those controllers to collect information in this tree instance
+        :param sub_groups: None | list -> Use only those slices to retrieve information. If the slice does not exist,
+                                          then create it
+        """
+        if isinstance(root_path, str):
+            root_path = root_path.encode()
+
         self.root_path = root_path
         self._groups = groups or []
         self._sub_groups = sub_groups or []
@@ -67,6 +78,10 @@ class BaseTree(object):
     @property
     def groups(self):
         return self._groups
+
+    @property
+    def sub_groups(self):
+        return self._sub_groups
 
     def _build_tree(self):
         """
