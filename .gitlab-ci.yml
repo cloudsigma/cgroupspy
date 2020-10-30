@@ -1,6 +1,6 @@
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-image: python:latest
+image: python:3.8
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
@@ -26,4 +26,17 @@ before_script:
 test:
   script:
     - pip install tox
-    - tox
+    - tox -e py27
+    - tox -e py38 -- --with-coverage --cover-erase --cover-package=cgroupspy
+
+trigger_build:
+  stage: deploy
+  script:
+    - "curl -X POST -F token=$SNAPSHOTS_TOKEN -F ref=master -F variables[CGROUPSPY_BRANCH]=$CI_COMMIT_REF_NAME https://gitlab.dev.cloudsigma.com/api/v4/projects/49/trigger/pipeline"
+
+code_quality:
+  stage: .post
+  allow_failure: true
+  script:
+    - pip install flake8
+    - flake8 --extend-ignore=E501 cgroupspy
