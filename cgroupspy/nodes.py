@@ -172,8 +172,10 @@ class Node(object):
             try:
                 if os.path.exists(child.full_path):
                     os.rmdir(child.full_path)
-            except OSError: pass
-            else: self.children.remove(child)
+            except OSError:
+                pass
+            else:
+                self.children.remove(child)
 
     def walk(self):
         """Walk through this node and its children - pre-order depth-first"""
@@ -263,7 +265,7 @@ class NodeVM(NodeControlGroup):
     def verbose_name(self):
         try:
             return self.nodes[0].verbose_name
-        except:
+        except Exception:
             return "AnonymousVM"
 
     @property

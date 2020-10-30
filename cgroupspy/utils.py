@@ -59,11 +59,11 @@ def get_device_major_minor(dev_path):
 
 
 def split_path_components(path):
-    components=[]
+    components = []
     while True:
         path, component = os.path.split(path)
         if component != "":
-             components.append(component)
+            components.append(component)
         else:
             if path != "":
                 components.append(path)
@@ -77,4 +77,4 @@ def mount(source, target, fs, options=""):
     if ret < 0:
         errno = ctypes.get_errno()
         raise RuntimeError("Error mounting {} ({}) on {} with options '{}': {}".
-          format(source, fs, target, options, os.strerror(errno)))
+                           format(source, fs, target, options, os.strerror(errno)))

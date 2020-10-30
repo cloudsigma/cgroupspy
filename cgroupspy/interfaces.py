@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from collections import Iterable
-from cgroupspy.contenttypes import DeviceAccess, BaseContentType
+from cgroupspy.contenttypes import BaseContentType
 
 
 class BaseFileInterface(object):
@@ -91,10 +91,10 @@ class BitFieldFile(BaseFileInterface):
     def sanitize_get(self, value):
         v = int(value)
         # Calculate the length of the value in bits by converting to hex
-        l = (len(hex(v)) - 2) * 4
+        length = (len(hex(v)) - 2) * 4
         # Increase length to the next multiple of 8
-        l += (7 - (l-1)%8)
-        return [bool((v >> i) & 1) for i in range(l)]
+        length += (7 - (length-1) % 8)
+        return [bool((v >> i) & 1) for i in range(length)]
 
     def sanitize_set(self, value):
         try:

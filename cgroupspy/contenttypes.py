@@ -94,6 +94,6 @@ class DeviceThrottle(BaseContentType):
             major_minor, limit = value.split()
             major, minor = major_minor.split(":")
             return cls(int(limit), major, minor)
-        except:
+        except Exception:
             raise RuntimeError("Value {} cannot be converted to a string that matches the pattern: "
                                "[device major]:[device minor] [throttle limit in bytes]".format(value))
