@@ -98,20 +98,41 @@ class BaseTree(object):
         """
         Initialise sub-groups, and create any that do not already exist.
         """
-
-        if self._sub_groups:
-            for sub_group in self._sub_groups:
-                for component in split_path_components(sub_group):
-                    fp = os.path.join(parent.full_path, component)
-                    if os.path.exists(fp):
-                        node = Node(name=component, parent=parent)
-                        parent.children.append(node)
-                    else:
-                        node = parent.create_cgroup(component)
-                    parent = node
-                self._init_children(node)
-        else:
+        if not self._sub_groups:
             self._init_children(parent)
+            return
+
+        sub_group_components = dict()
+
+        for sub_group in self._sub_groups:
+            sub_group = sub_group.strip()
+            if not sub_group:
+                continue
+
+            components = split_path_components(sub_group)
+            if not components:
+                continue
+
+            sub_group_components[sub_group] = components
+
+        self._sub_groups = list(sub_group_components.keys())
+        if not self._sub_groups:
+            self._init_children(parent)
+            return
+
+        for sub_group, components in sub_group_components.items():
+            for component in components:
+                if isinstance(component, str):
+                    component = component.encode()
+
+                fp = os.path.join(parent.full_path, component)
+                if os.path.exists(fp):
+                    node = Node(name=component, parent=parent)
+                    parent.children.append(node)
+                else:
+                    node = parent.create_cgroup(component)
+                parent = node
+            self._init_children(node)
 
     def _init_children(self, parent):
         """
