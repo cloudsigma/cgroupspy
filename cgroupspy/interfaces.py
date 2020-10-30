@@ -248,3 +248,24 @@ class TypedFile(BaseFileInterface):
                 return res[0]
             return None
         return res
+
+
+class DictOrFlagFile(BaseFileInterface):
+    def __init__(self, filename, readonly=None, writeonly=None):
+        super(DictOrFlagFile, self).__init__(filename, readonly=readonly, writeonly=writeonly)
+        self.interfaces = {
+            'dict': DictFile(filename),
+            'flag': FlagFile(filename),
+        }
+
+    def sanitize_get(self, value):
+        try:
+            return self.interfaces['dict'].sanitize_get(value)
+        except Exception:
+            return self.interfaces['flag'].sanitize_get(value)
+
+    def sanitize_set(self, value):
+        try:
+            return self.interfaces['dict'].sanitize_set(value)
+        except Exception:
+            return self.interfaces['flag'].sanitize_set(value)
