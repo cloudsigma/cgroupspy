@@ -60,16 +60,16 @@ class Node(object):
     }
 
     def __init__(self, name, parent=None):
-        try:
+        if isinstance(name, str):
             name = name.encode()
-        except AttributeError:
-            pass
+
         self.name = name
         self.verbose_name = name
-        try:
-            self.parent = parent.encode()
-        except AttributeError:
-            self.parent = parent
+
+        if parent and not isinstance(parent, Node):
+            raise ValueError('Parent should be another Node')
+
+        self.parent = parent
         self.children = []
         self.node_type = self._get_node_type()
         self.controller_type = self._get_controller_type()
@@ -138,11 +138,13 @@ class Node(object):
         """
         Create a cgroup by name and attach it under this node.
         """
+        if isinstance(name, str):
+            name = name.encode()
+
         node = Node(name, parent=self)
         if node in self.children:
             raise RuntimeError('Node {} already exists under {}'.format(name, self.path))
 
-        name = name.encode()
         fp = os.path.join(self.full_path, name)
         os.mkdir(fp)
         self.children.append(node)
@@ -230,14 +232,14 @@ class NodeControlGroup(object):
         self.nodes.append(node)
         if node.controller:
             self.controllers[node.controller_type] = node.controller
-            setattr(self, node.controller_type, node.controller)
+            setattr(self, node.controller_type.decode(), node.controller)
 
     def __repr__(self):
         return "<{} {}>".format(self.__class__.__name__, self.name.decode())
 
     @property
     def children(self):
-        return self.children_map.values()
+        return list(self.children_map.values())
 
     @property
     def group_tasks(self):
@@ -270,8 +272,8 @@ class NodeVM(NodeControlGroup):
 
     @property
     def emulator(self):
-        return self.children_map.get("emulator", None)
+        return self.children_map.get(b"emulator", None)
 
     @property
     def vcpus(self):
-        return [node for name, node in self.children_map.items() if name.startswith("vcpu")]
+        return [node for name, node in self.children_map.items() if name.startswith(b"vcpu")]
