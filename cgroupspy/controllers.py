@@ -25,9 +25,10 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import os
+import errno
 from cgroupspy.contenttypes import DeviceAccess, DeviceThrottle
 
-from .interfaces import FlagFile, BitFieldFile, IntegerFile, SplitValueFile, DictOrFlagFile
+from .interfaces import BaseFileInterface, FlagFile, BitFieldFile, IntegerFile, SplitValueFile, DictOrFlagFile
 from .interfaces import MultiLineIntegerFile, CommaDashSetFile, DictFile, IntegerListFile, TypedFile
 
 
@@ -50,11 +51,61 @@ class Controller(object):
 
         return os.path.join(self.node.full_path, filename)
 
+    def list_interfaces(self):
+        result = {}
+
+        for data in [self.__class__.__dict__, Controller.__dict__]:
+            for k, interface in data.items():
+                if not issubclass(interface.__class__, BaseFileInterface):
+                    continue
+
+                result[k] = interface
+
+        return result
+
+    def get_interface(self, key):
+        if key in self.__class__.__dict__:
+            interface = self.__class__.__dict__[key]
+        elif key in Controller.__dict__:
+            interface = Controller.__dict__[key]
+        else:
+            return None
+
+        if not issubclass(interface.__class__, BaseFileInterface):
+            return None
+
+        return interface
+
     def get_property(self, filename):
         """Opens the file and reads the value"""
 
         with open(self.filepath(filename)) as f:
             return f.read().strip()
+
+    def get_content(self, key):
+        interface = self.get_interface(key)
+
+        if interface is None or interface.writeonly:
+            return None
+
+        try:
+            content = self.get_property(interface.filename)
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                # does not exist
+                return None
+            elif e.errno == errno.EACCES:
+                # cannot be read
+                return None
+            elif e.errno == errno.EINVAL:
+                # invalid argument
+                return None
+            raise
+
+        if not content.strip():
+            return ''
+
+        return interface.sanitize_get(content)
 
     def set_property(self, filename, value):
         """Opens the file and writes the value"""
