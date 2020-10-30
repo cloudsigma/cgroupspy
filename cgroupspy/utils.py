@@ -46,6 +46,12 @@ def walk_up_tree(root):
 
 
 def split_path_components(path):
+    if isinstance(path, bytes):
+        path = str(path.decode())
+
+    if path.endswith('/'):
+        path = path.rstrip('/')
+
     components = []
     while True:
         path, component = os.path.split(path)
@@ -56,4 +62,8 @@ def split_path_components(path):
                 components.append(path)
             break
     components.reverse()
+
+    if len(components) > 0 and components[0] == '/':
+        return components[1:]
+
     return components
