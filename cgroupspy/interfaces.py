@@ -211,17 +211,21 @@ class SplitValueFile(BaseFileInterface):
     """
     readonly = True
 
-    def __init__(self, filename, position, restype=None, splitchar=" "):
+    def __init__(self, filename, position, restype=None, splitchar=" ", prefix="Total"):
         super(SplitValueFile, self).__init__(filename)
         self.position = position
-        self.splitchar = splitchar
         self.restype = restype
+        self.splitchar = splitchar
+        self.prefix = prefix
 
     def sanitize_get(self, value):
         res = value.strip().split(self.splitchar)[self.position]
         if self.restype and not isinstance(res, self.restype):
             return self.restype(res)
         return res
+
+    def sanitize_set(self, value):
+        return '{}{}{}'.format(self.prefix, self.splitchar, value)
 
 
 class TypedFile(BaseFileInterface):
