@@ -247,11 +247,23 @@ class VMTree(GroupedTree):
         super(VMTree, self).__init__(*args, **kwargs)
 
     def _create_node(self, name, parent):
-        if b"libvirt-qemu" in name or parent.name == b"qemu":
+        if b"libvirt-qemu" in name or b"machine-qemu" in name or parent.name == b"qemu":
             vm_node = NodeVM(name, parent=parent)
-            self.vms[name] = vm_node
+            if isinstance(name, bytes):
+                key = name.decode()
+            else:
+                key = name
+            self.vms[key] = vm_node
             return vm_node
         return super(VMTree, self)._create_node(name, parent=parent)
 
     def get_vm_node(self, name):
-        return self.vms.get(b'%s.libvirt-qemu' % (name))
+        keys = [
+            name,
+            '%s.libvirt-qemu' % name,
+            "machine-qemu%s" % name
+        ]
+
+        for key in keys:
+            if key in self.vms:
+                return self.vms[key]
