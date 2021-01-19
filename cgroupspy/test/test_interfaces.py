@@ -28,8 +28,9 @@ from unittest import TestCase
 
 import mock
 
+from ..contenttypes import DeviceAccess, DeviceThrottle
 from ..interfaces import BaseFileInterface, FlagFile, BitFieldFile, CommaDashSetFile, DictFile, \
-    IntegerFile, IntegerListFile, ListFile, MultiLineIntegerFile
+    IntegerFile, IntegerListFile, ListFile, MultiLineIntegerFile, TypedFile
 
 
 class FaceHolder(object):
@@ -94,6 +95,22 @@ class InterfacesTest(TestCase):
 
     def test_comma_dash(self):
         self.patch_face(face=CommaDashSetFile("commadash"))
+
+        fh = FaceHolder("")
+        self.assertEqual(fh.face, set())
+
+        fh = FaceHolder(" ")
+        self.assertEqual(fh.face, set())
+
+        fh.face = set()
+        self.assertEqual(fh.face, set())
+
+        fh.face = []
+        self.assertEqual(fh.face, set())
+
+        fh.face = {}
+        self.assertEqual(fh.face, set())
+
         fh = FaceHolder("1,2,4-6,18-23,7")
 
         expected = {1, 2, 4, 5, 6, 7, 18, 19, 20, 21, 22, 23}
@@ -101,7 +118,15 @@ class InterfacesTest(TestCase):
 
         fh.face = {1, 2, 3}
         self.assertEqual(fh.face, {1, 2, 3})
-        self.assertEqual(fh.val, "1,2,3")
+        self.assertEqual(fh.val, "1-3")
+
+        fh.face = [1, 2, 3]
+        self.assertEqual(fh.face, {1, 2, 3})
+        self.assertEqual(fh.val, "1-3")
+
+        fh.face = [1, 2, 2, 3]
+        self.assertEqual(fh.face, {1, 2, 3})
+        self.assertEqual(fh.val, "1-3")
 
         fh.face = {1}
         self.assertEqual(fh.face, {1})
@@ -145,3 +170,92 @@ class InterfacesTest(TestCase):
         self.patch_face(face=MultiLineIntegerFile("multiint"))
         fh = FaceHolder("16\n18\n20\n22")
         self.assertEqual(fh.face, [16, 18, 20, 22])
+
+
+def test_comma_dash_more():
+    pairs = [
+        ("1-2,4-7,18-23", {1, 2, 4, 5, 6, 7, 18, 19, 20, 21, 22, 23}),
+        ("1,3-4,6,8-9,11", {1, 3, 4, 6, 8, 9, 11}),
+        ("4,8-10,12", {4, 8, 9, 10, 12}),
+        ("1-3", {1, 2, 3}),
+        ("1", {1}),
+    ]
+
+    for encoded, data in pairs:
+        yield check_comma_dash_case, encoded, data
+
+
+def check_comma_dash_case(encoded, data):
+    with mock.patch.multiple(FaceHolder, face=CommaDashSetFile("commadash")):
+        fh = FaceHolder(encoded)
+        assert fh.face == data
+
+        fh.face = data
+        assert fh.face == data
+        assert fh.val == encoded
+
+
+def test_device_throttle():
+    pairs = [
+        ("1:2 100", DeviceThrottle(major=1, minor=2, limit=100)),
+        ("1:2 100", DeviceThrottle(major='1', minor='2', limit=100)),
+        ("0:0 100", DeviceThrottle(major=0, minor=0, limit=100)),
+        ("*:* 100", DeviceThrottle(major=None, minor=None, limit=100)),
+        ("0:* 100", DeviceThrottle(major=0, minor=None, limit=100)),
+    ]
+
+    for encoded, data in pairs:
+        yield check_device_throttle_case, encoded, data
+
+    yield check_device_throttle_many, "   \n", []
+    yield check_device_throttle_many, "\n".join([p[0] for p in pairs]), [p[1] for p in pairs]
+
+
+def check_device_throttle_many(encoded, data):
+    with mock.patch.multiple(FaceHolder, face=TypedFile("device_throttle", DeviceThrottle, many=True)):
+        fh = FaceHolder(encoded)
+        assert fh.face == data
+
+
+def check_device_throttle_case(encoded, data):
+    with mock.patch.multiple(FaceHolder, face=TypedFile("device_throttle", DeviceThrottle, many=False)):
+        fh = FaceHolder(encoded)
+        assert fh.face == data
+
+        fh.face = data
+        assert fh.face == data
+        assert fh.val == encoded
+
+
+def test_device_access():
+    pairs = [
+        ("c 1:3 rwm", DeviceAccess(dev_type="c", major=1, minor=3, access="rwm")),
+        ("c 1:3 rwm", DeviceAccess(dev_type="c", major='1', minor='3', access=7)),
+        ("c 5:* rwm", DeviceAccess(dev_type="c", major=5, minor=None, access="rwm")),
+        ("c 5:0 rwm", DeviceAccess(dev_type="c", major=5, minor=0, access="rwm")),
+        ("b *:* rwm", DeviceAccess(dev_type="b", major=None, minor=None, access="rwm")),
+        ("b 0:0 rwm", DeviceAccess(dev_type="b", major=0, minor=0, access="rwm")),
+        ("c 136:* rw", DeviceAccess(dev_type="c", major=136, minor=None, access="rw")),
+    ]
+
+    for encoded, data in pairs:
+        yield check_device_access_case, encoded, data
+
+    yield check_device_access_many, "   \n", []
+    yield check_device_access_many, "\n".join([p[0] for p in pairs]), [p[1] for p in pairs]
+
+
+def check_device_access_case(encoded, data):
+    with mock.patch.multiple(FaceHolder, face=TypedFile("device_access", DeviceAccess, many=False)):
+        fh = FaceHolder(encoded)
+        assert fh.face == data
+
+        fh.face = data
+        assert fh.face == data
+        assert fh.val == encoded
+
+
+def check_device_access_many(encoded, data):
+    with mock.patch.multiple(FaceHolder, face=TypedFile("device_access", DeviceAccess, many=True)):
+        fh = FaceHolder(encoded)
+        assert fh.face == data

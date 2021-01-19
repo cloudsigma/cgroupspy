@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from collections import Iterable
-from cgroupspy.contenttypes import DeviceAccess, BaseContentType
+from cgroupspy.contenttypes import BaseContentType
 
 
 class BaseFileInterface(object):
@@ -91,10 +91,10 @@ class BitFieldFile(BaseFileInterface):
     def sanitize_get(self, value):
         v = int(value)
         # Calculate the length of the value in bits by converting to hex
-        l = (len(hex(v)) - 2) * 4
+        length = (len(hex(v)) - 2) * 4
         # Increase length to the next multiple of 8
-        l += (7 - (l-1)%8)
-        return [bool((v >> i) & 1) for i in range(l)]
+        length += (7 - (length - 1) % 8)
+        return [bool((v >> i) & 1) for i in range(length)]
 
     def sanitize_set(self, value):
         try:
@@ -125,7 +125,6 @@ class IntegerFile(BaseFileInterface):
 
 
 class DictFile(BaseFileInterface):
-
     def sanitize_get(self, value):
         res = {}
         for el in value.split("\n"):
@@ -136,7 +135,9 @@ class DictFile(BaseFileInterface):
     def sanitize_set(self, value):
         if not isinstance(value, dict):
             raise ValueError("Value {} must be a dict".format(value))
-        return ",".join(str(x) for x in value)
+
+        keys = sorted(value.keys())
+        return "\n".join("{} {}".format(k, value[k]) for k in keys)
 
 
 class ListFile(BaseFileInterface):
@@ -158,8 +159,9 @@ class IntegerListFile(ListFile):
 
     def sanitize_set(self, value):
         if value is None:
-            value = -1
-        return int(value)
+            value = '-1'
+
+        return " ".join([str(v) for v in value])
 
 
 class CommaDashSetFile(BaseFileInterface):
@@ -184,13 +186,58 @@ class CommaDashSetFile(BaseFileInterface):
     def sanitize_set(self, value):
         if len(value) == 0:
             return ' '
+
         try:
-            value = value.encode()
+            value = value.decode()
         except AttributeError:
             pass
-        if isinstance(value, bytes) or not isinstance(value, Iterable):
-            value = [str(value)]
-        return ",".join(str(x) for x in value)
+
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return ' '
+            value = value.split(',')
+
+        if isinstance(value, Iterable):
+            value = set(value)
+        else:
+            raise ValueError("Value {} must be a sequence of int".format(value))
+
+        for k in value:
+            if not isinstance(k, int):
+                raise ValueError("Value {} must be a sequence of int".format(value))
+
+        value = sorted(list(value))
+        index = [i for i in range(len(value))]
+        for i in range(len(value)):
+            if index[i] != i:
+                continue
+
+            j = i
+
+            while j < len(value) - 1:
+                if value[j] + 1 == value[j + 1]:
+                    index[j + 1] = i
+                    j += 1
+                else:
+                    break
+
+        parts = []
+        for i in range(len(value)):
+            if i > 0 and index[i - 1] == index[i]:
+                continue
+
+            j = i
+
+            while j + 1 < len(value) and index[j + 1] == index[j]:
+                j += 1
+
+            if i == j:
+                parts.append(str(value[i]))
+            else:
+                parts.append('{}-{}'.format(value[i], value[j]))
+
+        return ','.join(parts)
 
 
 class MultiLineIntegerFile(BaseFileInterface):
@@ -201,8 +248,9 @@ class MultiLineIntegerFile(BaseFileInterface):
 
     def sanitize_set(self, value):
         if value is None:
-            value = -1
-        return int(value)
+            return '-1'
+
+        return '\n'.join(str(x) for x in value)
 
 
 class SplitValueFile(BaseFileInterface):
@@ -211,17 +259,21 @@ class SplitValueFile(BaseFileInterface):
     """
     readonly = True
 
-    def __init__(self, filename, position, restype=None, splitchar=" "):
+    def __init__(self, filename, position, restype=None, splitchar=" ", prefix="Total"):
         super(SplitValueFile, self).__init__(filename)
         self.position = position
-        self.splitchar = splitchar
         self.restype = restype
+        self.splitchar = splitchar
+        self.prefix = prefix
 
     def sanitize_get(self, value):
         res = value.strip().split(self.splitchar)[self.position]
         if self.restype and not isinstance(res, self.restype):
             return self.restype(res)
         return res
+
+    def sanitize_set(self, value):
+        return '{}{}{}'.format(self.prefix, self.splitchar, value)
 
 
 class TypedFile(BaseFileInterface):
@@ -237,14 +289,51 @@ class TypedFile(BaseFileInterface):
 
     def sanitize_set(self, value):
         if isinstance(value, self.contenttype):
-            return value
+            return str(value)
+
+        if self.many:
+            items = []
+            for entry in value:
+                if isinstance(entry, str):
+                    entry = entry.strip()
+                    if not entry:
+                        continue
+                    items.append(str(self.contenttype.from_string(entry)))
+                else:
+                    items.append(str(entry))
+            return "\n".join(items)
+        else:
+            return str(self.contenttype.from_string(value))
+
+    def sanitize_get(self, value):
+        if self.many:
+            result = []
+            for line in value.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                result.append(self.contenttype.from_string(line))
+            return result
 
         return self.contenttype.from_string(value)
 
+
+class DictOrFlagFile(BaseFileInterface):
+    def __init__(self, filename, readonly=None, writeonly=None):
+        super(DictOrFlagFile, self).__init__(filename, readonly=readonly, writeonly=writeonly)
+        self.interfaces = {
+            'dict': DictFile(filename),
+            'flag': FlagFile(filename),
+        }
+
     def sanitize_get(self, value):
-        res = [self.contenttype.from_string(val) for val in value.split("\n") if val]
-        if not self.many:
-            if res:
-                return res[0]
-            return None
-        return res
+        try:
+            return self.interfaces['dict'].sanitize_get(value)
+        except Exception:
+            return self.interfaces['flag'].sanitize_get(value)
+
+    def sanitize_set(self, value):
+        try:
+            return self.interfaces['dict'].sanitize_set(value)
+        except Exception:
+            return self.interfaces['flag'].sanitize_set(value)

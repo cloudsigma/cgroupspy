@@ -27,37 +27,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
 
 from .nodes import Node, NodeControlGroup, NodeVM
-from .utils import walk_tree, walk_up_tree, split_path_components, mount
-
-
-def bootstrap(root_path=b"/sys/fs/cgroup/", subsystems=None):
-    if not os.path.ismount(root_path):
-        if not os.path.isdir(root_path):
-            os.makedirs(root_path)
-        try:
-            mount(b"cgroup_root", root_path, b"tmpfs")
-        except RuntimeError:
-            os.rmdir(root_path)
-            raise
-    if subsystems is None:
-        subsystems = Node.CONTROLLERS.keys()
-    for subsystem in subsystems:
-        path = root_path+subsystem
-        if not os.path.ismount(path):
-            if not os.path.isdir(path):
-                os.makedirs(path)
-            try:
-                mount(subsystem, path, b"cgroup", subsystem)
-            except RuntimeError:
-                os.rmdir(path)
-                raise
+from .utils import walk_tree, walk_up_tree, split_path_components
 
 
 class BaseTree(object):
 
     """ A basic cgroup node tree. An exact representation of the filesystem tree, provided by cgroups. """
 
-    def __init__(self, root_path="/sys/fs/cgroup/", groups=None, sub_groups=None):
+    def __init__(self, root_path=b"/sys/fs/cgroup/", groups=None, sub_groups=None):
+        """
+        Construct a basic cgroup node tree. An exact representation of the filesystem tree, provided by cgroups.
+
+        :param root_path: str -> The path of the root folder containing the cgroups. By default it is /sys/fs/cgroup/
+        :param groups: None | list -> Use only those controllers to collect information in this tree instance
+        :param sub_groups: None | list -> Use only those slices to retrieve information. If the slice does not exist,
+                                          then create it
+        """
+        if isinstance(root_path, str):
+            root_path = root_path.encode()
+
         self.root_path = root_path
         self._groups = groups or []
         self._sub_groups = sub_groups or []
@@ -67,6 +55,10 @@ class BaseTree(object):
     @property
     def groups(self):
         return self._groups
+
+    @property
+    def sub_groups(self):
+        return self._sub_groups
 
     def _build_tree(self):
         """
@@ -83,20 +75,41 @@ class BaseTree(object):
         """
         Initialise sub-groups, and create any that do not already exist.
         """
-
-        if self._sub_groups:
-            for sub_group in self._sub_groups:
-                for component in split_path_components(sub_group):
-                    fp = os.path.join(parent.full_path, component)
-                    if os.path.exists(fp):
-                        node = Node(name=component, parent=parent)
-                        parent.children.append(node)
-                    else:
-                        node = parent.create_cgroup(component)
-                    parent = node
-                self._init_children(node)
-        else:
+        if not self._sub_groups:
             self._init_children(parent)
+            return
+
+        sub_group_components = dict()
+
+        for sub_group in self._sub_groups:
+            sub_group = sub_group.strip()
+            if not sub_group:
+                continue
+
+            components = split_path_components(sub_group)
+            if not components:
+                continue
+
+            sub_group_components[sub_group] = components
+
+        self._sub_groups = list(sub_group_components.keys())
+        if not self._sub_groups:
+            self._init_children(parent)
+            return
+
+        for sub_group, components in sub_group_components.items():
+            for component in components:
+                if isinstance(component, str):
+                    component = component.encode()
+
+                fp = os.path.join(parent.full_path, component)
+                if os.path.exists(fp):
+                    node = Node(name=component, parent=parent)
+                    parent.children.append(node)
+                else:
+                    node = parent.create_cgroup(component)
+                parent = node
+            self._init_children(node)
 
     def _init_children(self, parent):
         """
@@ -211,11 +224,23 @@ class VMTree(GroupedTree):
         super(VMTree, self).__init__(*args, **kwargs)
 
     def _create_node(self, name, parent):
-        if b"libvirt-qemu" in name or parent.name == b"qemu":
+        if b"libvirt-qemu" in name or b"machine-qemu" in name or parent.name == b"qemu":
             vm_node = NodeVM(name, parent=parent)
-            self.vms[name] = vm_node
+            if isinstance(name, bytes):
+                key = name.decode()
+            else:
+                key = name
+            self.vms[key] = vm_node
             return vm_node
         return super(VMTree, self)._create_node(name, parent=parent)
 
     def get_vm_node(self, name):
-        return self.vms.get(b'%s.libvirt-qemu' % (name))
+        keys = [
+            name,
+            '%s.libvirt-qemu' % name,
+            "machine-qemu%s" % name
+        ]
+
+        for key in keys:
+            if key in self.vms:
+                return self.vms[key]

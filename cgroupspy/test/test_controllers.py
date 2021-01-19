@@ -52,3 +52,5 @@ class TestControllers(TestCase):
         ctl.set_property("bostan", val)
         saved = ctl.get_property("bostan")
         self.assertEqual(saved, val)
+        self.assertIsNotNone(ctl.get_interface('tasks'))
+        self.assertIsNone(ctl.get_interface('bostan'))
