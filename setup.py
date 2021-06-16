@@ -32,4 +32,5 @@ setup(
     license='New BSD',
     description="Python library for managing cgroups",
     long_description=long_description,
+    long_description_content_type='text/markdown',
 )
