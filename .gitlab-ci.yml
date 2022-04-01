@@ -27,7 +27,7 @@ test:
   script:
     - pip install tox
     - tox -e py27
-    - tox -e py38 -- --with-coverage --cover-erase --cover-package=cgroupspy
+    - tox -e py38 -- --with-coverage
 
 trigger_build:
   stage: deploy
