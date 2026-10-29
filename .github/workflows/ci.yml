@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-python:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['2.7', '3.6', '3.7', '3.8']
+    container: python:${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install supported test dependencies and package
+        run: |
+          python -m pip install -r requirements/test.txt
+          python -m pip install .
+      - name: Test legacy contract and new APIs
+        run: python -m nose2 -v
+
+  python:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r requirements/test.txt
+      - run: python -m nose2 -v
+
+  distributions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - name: Test installed wheel outside the checkout
+        run: |
+          python -m pip install dist/*.whl
+          cd "$(mktemp -d)"
+          python -c 'import cgroupspy; from cgroupspy.discovery import discover; from cgroupspy.v2 import V2Tree; print(cgroupspy.__version__)'
+      - name: Test source distribution includes runnable tests
+        run: |
+          python -m pip install -r requirements/test.txt
+          archive="$PWD/dist/cgroupspy-0.3.0.tar.gz"
+          cd "$(mktemp -d)"
+          tar -xzf "$archive"
+          cd cgroupspy-0.3.0
+          python -m nose2 -v
+      - uses: actions/upload-artifact@v7
+        with:
+          name: distributions
+          path: dist/*
+
+  linux-integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Verify commands in a disposable delegated cgroup v2 subtree
+        run: |
+          sudo systemd-run --wait --pipe --collect \
+            --unit="cgroupspy-integration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --property=Delegate=yes \
+            env PYTHONPATH="$PWD" CGROUPSPY_RUN_LINUX_INTEGRATION=1 \
+            "$(command -v python)" "$PWD/tests/integration_linux.py"
+      - name: Verify legacy v1 membership commands in a private mount namespace
+        run: |
+          sudo unshare --mount --propagation private \
+            env PYTHONPATH="$PWD" CGROUPSPY_RUN_LINUX_INTEGRATION=1 \
+            "$(command -v python)" "$PWD/tests/integration_linux.py" --v1

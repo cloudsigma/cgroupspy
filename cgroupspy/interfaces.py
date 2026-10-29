@@ -30,6 +30,38 @@ except ImportError:
     from collections import Iterable
 from cgroupspy.contenttypes import BaseContentType
 
+try:
+    string_types = (basestring,)
+    integer_types = (int, long)
+except NameError:
+    string_types = (str,)
+    integer_types = (int,)
+
+
+def _integer_input(value):
+    if isinstance(value, bytes) and not isinstance(value, string_types):
+        value = value.decode('ascii')
+    if not isinstance(value, integer_types + string_types):
+        raise ValueError("Expected an integer or an integer string")
+    return int(value)
+
+
+class BatchWriteError(IOError):
+    """A kernel command failed after zero or more records were applied.
+
+    The original errno is retained. No rollback is attempted, since cgroup
+    command files are not transactional.
+    """
+
+    def __init__(self, filename, failed_record, completed_records, original_error):
+        self.failed_record = failed_record
+        self.completed_records = tuple(completed_records)
+        self.record_index = len(self.completed_records)
+        self.original_error = original_error
+        message = "Record {!r} failed after {} completed records: {}".format(
+            failed_record, self.record_index, original_error)
+        IOError.__init__(self, original_error.errno, message, filename)
+
 
 class BaseFileInterface(object):
 
@@ -38,19 +70,21 @@ class BaseFileInterface(object):
     """
     readonly = False
     writeonly = False
+    write_records = False
 
     def __init__(self, filename, readonly=None, writeonly=None):
-        if readonly and writeonly:
-            raise RuntimeError("This interface cannot be both readonly and writeonly")
-
         try:
             self.filename = filename.encode()
         except AttributeError:
             self.filename = filename
-        self.readonly = readonly or self.readonly
-        self.writeonly = writeonly or self.writeonly
+        self.readonly = self.readonly if readonly is None else readonly
+        self.writeonly = self.writeonly if writeonly is None else writeonly
+        if self.readonly and self.writeonly:
+            raise RuntimeError("This interface cannot be both readonly and writeonly")
 
     def __get__(self, instance, owner):
+        if instance is None:
+            return self
         if self.writeonly:
             raise RuntimeError("This interface is writeonly")
 
@@ -63,6 +97,20 @@ class BaseFileInterface(object):
 
         value = self.sanitize_set(value)
         if value is not None:
+            if self.write_records:
+                # The sanitizer validates the complete batch before any writes.
+                # Each set_property call opens/closes the file independently;
+                # buffering cannot combine multiple kernel commands.
+                result = None
+                completed = []
+                for record in value.splitlines():
+                    if record.strip():
+                        try:
+                            result = instance.set_property(self.filename, record)
+                        except (IOError, OSError) as error:
+                            raise BatchWriteError(self.filename, record, completed, error)
+                        completed.append(record)
+                return result
             return instance.set_property(self.filename, value)
 
     def sanitize_get(self, value):
@@ -128,9 +176,13 @@ class IntegerFile(BaseFileInterface):
 
 
 class DictFile(BaseFileInterface):
+    write_records = True
+
     def sanitize_get(self, value):
         res = {}
-        for el in value.split("\n"):
+        for el in value.splitlines():
+            if not el.strip():
+                continue
             key, val = el.split()
             res[key] = int(val)
         return res
@@ -140,7 +192,12 @@ class DictFile(BaseFileInterface):
             raise ValueError("Value {} must be a dict".format(value))
 
         keys = sorted(value.keys())
-        return "\n".join("{} {}".format(k, value[k]) for k in keys)
+        records = []
+        for key in keys:
+            if not str(key) or any(char.isspace() for char in str(key)):
+                raise ValueError("Dictionary keys must be single words")
+            records.append("{} {}".format(key, _integer_input(value[key])))
+        return "\n".join(records)
 
 
 class ListFile(BaseFileInterface):
@@ -162,7 +219,7 @@ class IntegerListFile(ListFile):
 
     def sanitize_set(self, value):
         if value is None:
-            value = '-1'
+            return '-1'
 
         return " ".join([str(v) for v in value])
 
@@ -179,27 +236,30 @@ class CommaDashSetFile(BaseFileInterface):
         for el_group in value.strip().split(','):
             if "-" in el_group:
                 start, end = el_group.split("-")
-                for el in range(int(start), int(end) + 1):
+                start, end = int(start), int(end)
+                if start < 0 or end < start:
+                    raise ValueError("CPU/node ranges must be nonnegative and ascending")
+                for el in range(start, end + 1):
                     elems.append(el)
             else:
                 if el_group != '':
-                    elems.append(int(el_group))
+                    item = int(el_group)
+                    if item < 0:
+                        raise ValueError("CPU/node identifiers must be nonnegative")
+                    elems.append(item)
         return set(elems)
 
     def sanitize_set(self, value):
-        if len(value) == 0:
-            return ' '
-
         try:
             value = value.decode()
         except AttributeError:
             pass
 
-        if isinstance(value, str):
+        if isinstance(value, string_types):
             value = value.strip()
             if not value:
                 return ' '
-            value = value.split(',')
+            value = self.sanitize_get(value)
 
         if isinstance(value, Iterable):
             value = set(value)
@@ -207,8 +267,11 @@ class CommaDashSetFile(BaseFileInterface):
             raise ValueError("Value {} must be a sequence of int".format(value))
 
         for k in value:
-            if not isinstance(k, int):
+            if not isinstance(k, integer_types) or k < 0:
                 raise ValueError("Value {} must be a sequence of int".format(value))
+
+        if not value:
+            return ' '
 
         value = sorted(list(value))
         index = [i for i in range(len(value))]
@@ -244,6 +307,7 @@ class CommaDashSetFile(BaseFileInterface):
 
 
 class MultiLineIntegerFile(BaseFileInterface):
+    write_records = True
 
     def sanitize_get(self, value):
         int_list = [int(val) for val in value.strip().split("\n") if val]
@@ -252,8 +316,13 @@ class MultiLineIntegerFile(BaseFileInterface):
     def sanitize_set(self, value):
         if value is None:
             return '-1'
-
-        return '\n'.join(str(x) for x in value)
+        if isinstance(value, bytes) and not isinstance(value, string_types):
+            value = value.decode('ascii')
+        if isinstance(value, string_types):
+            value = value.split()
+        elif isinstance(value, integer_types):
+            value = [value]
+        return '\n'.join(str(_integer_input(x)) for x in value)
 
 
 class SplitValueFile(BaseFileInterface):
@@ -270,7 +339,21 @@ class SplitValueFile(BaseFileInterface):
         self.prefix = prefix
 
     def sanitize_get(self, value):
-        res = value.strip().split(self.splitchar)[self.position]
+        lines = [line.strip() for line in value.splitlines() if line.strip()]
+        # Block I/O files contain per-device operation rows before the aggregate.
+        # Match the standalone prefix, never a device's own "Total" field.
+        matching = [line for line in lines if line.split()[0] == self.prefix]
+        if matching:
+            line = matching[-1]
+        elif len(lines) == 1:
+            # Retain the original generic single-line interface behavior.
+            line = lines[0]
+        else:
+            raise ValueError("No {} aggregate in {}".format(self.prefix, self.filename))
+        if self.splitchar == ' ':
+            res = line.split()[self.position]
+        else:
+            res = line.split(self.splitchar)[self.position]
         if self.restype and not isinstance(res, self.restype):
             return self.restype(res)
         return res
@@ -288,22 +371,31 @@ class TypedFile(BaseFileInterface):
 
         self.contenttype = contenttype
         self.many = many
+        self.write_records = many
         super(TypedFile, self).__init__(filename, readonly=readonly, writeonly=writeonly)
 
     def sanitize_set(self, value):
         if isinstance(value, self.contenttype):
-            return str(value)
+            # Content objects are mutable: validate their current serialized
+            # fields too, rather than trusting construction-time validation.
+            return str(self.contenttype.from_string(str(value)))
 
         if self.many:
             items = []
+            if isinstance(value, bytes) and not isinstance(value, string_types):
+                value = value.decode('ascii')
+            if isinstance(value, string_types):
+                value = value.splitlines()
             for entry in value:
-                if isinstance(entry, str):
+                if isinstance(entry, bytes) and not isinstance(entry, string_types):
+                    entry = entry.decode('ascii')
+                if isinstance(entry, string_types):
                     entry = entry.strip()
                     if not entry:
                         continue
                     items.append(str(self.contenttype.from_string(entry)))
                 else:
-                    items.append(str(entry))
+                    items.append(str(self.contenttype.from_string(str(entry))))
             return "\n".join(items)
         else:
             return str(self.contenttype.from_string(value))
@@ -332,11 +424,25 @@ class DictOrFlagFile(BaseFileInterface):
     def sanitize_get(self, value):
         try:
             return self.interfaces['dict'].sanitize_get(value)
-        except Exception:
+        except (TypeError, ValueError):
             return self.interfaces['flag'].sanitize_get(value)
 
     def sanitize_set(self, value):
-        try:
+        if isinstance(value, dict):
             return self.interfaces['dict'].sanitize_set(value)
-        except Exception:
+        if value is None or isinstance(value, (bool,) + integer_types):
             return self.interfaces['flag'].sanitize_set(value)
+        raise ValueError("Value must be a dictionary or a flag")
+
+
+class OomControlFile(DictOrFlagFile):
+    """Read OOM status as a dictionary, write only the disable flag."""
+
+    def sanitize_set(self, value):
+        if isinstance(value, dict):
+            if set(value) != set(['oom_kill_disable']):
+                raise ValueError("Only oom_kill_disable can be written to OOM control")
+            value = value['oom_kill_disable']
+        if value is not None and not isinstance(value, (bool,) + integer_types):
+            raise ValueError("OOM disable flag must be a boolean or integer")
+        return self.interfaces['flag'].sanitize_set(value)
