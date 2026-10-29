@@ -25,6 +25,54 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import os
+import sys
+
+text_type = type(u'')
+
+
+def to_bytes(value):
+    """Encode filesystem names without changing the public bytes path API."""
+    if isinstance(value, bytes):
+        return value
+    if not isinstance(value, text_type) and hasattr(os, 'fspath'):
+        value = os.fspath(value)
+        if isinstance(value, bytes):
+            return value
+    if not isinstance(value, text_type):
+        raise TypeError('A filesystem path must be text or bytes')
+    if hasattr(os, 'fsencode'):
+        return os.fsencode(value)
+    return value.encode(sys.getfilesystemencoding() or 'utf-8')
+
+
+def to_text(value):
+    if isinstance(value, text_type):
+        return value
+    if hasattr(os, 'fsdecode'):
+        return os.fsdecode(value)
+    return value.decode(sys.getfilesystemencoding() or 'utf-8')
+
+
+def validate_child_name(name):
+    """Return a bytes name restricted to one child of the selected directory."""
+    name = to_bytes(name)
+    if (not name or name in (b'.', b'..') or b'\x00' in name or
+            b'/' in name or (os.altsep and to_bytes(os.altsep) in name)):
+        raise ValueError('A cgroup name must be a single nonempty path component')
+    return name
+
+
+def normalize_tree_path(path):
+    path = to_bytes(path)
+    if path:
+        return path.rstrip(b'/') or b'/'
+    return path
+
+
+def is_safe_controller_alias(path, root):
+    """Recognize a v1 controller alias confined to an immediate sibling mount."""
+    return (os.path.islink(path) and os.path.isdir(path) and
+            os.path.dirname(os.path.realpath(path)) == os.path.realpath(root))
 
 
 def walk_tree(root):
@@ -46,24 +94,4 @@ def walk_up_tree(root):
 
 
 def split_path_components(path):
-    if isinstance(path, bytes):
-        path = str(path.decode())
-
-    if path.endswith('/'):
-        path = path.rstrip('/')
-
-    components = []
-    while True:
-        path, component = os.path.split(path)
-        if component != "":
-            components.append(component)
-        else:
-            if path != "":
-                components.append(path)
-            break
-    components.reverse()
-
-    if len(components) > 0 and components[0] == '/':
-        return components[1:]
-
-    return components
+    return [component for component in to_text(path).split('/') if component]

@@ -25,6 +25,24 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+try:
+    string_types = (basestring,)
+    integer_types = (int, long)
+except NameError:
+    string_types = (str,)
+    integer_types = (int,)
+
+
+def _nonnegative_integer(value, name):
+    if isinstance(value, bytes) and not isinstance(value, string_types):
+        value = value.decode('ascii')
+    if not isinstance(value, integer_types + string_types):
+        raise ValueError("{} must be a nonnegative integer".format(name))
+    result = int(value)
+    if result < 0:
+        raise ValueError("{} must be a nonnegative integer".format(name))
+    return result
+
 
 class BaseContentType(object):
 
@@ -51,19 +69,25 @@ class DeviceAccess(BaseContentType):
 
     def __init__(self, dev_type=None, major=None, minor=None, access=None):
         self.dev_type = dev_type or self.TYPE_ALL
+        if self.dev_type not in (self.TYPE_ALL, 'a', self.TYPE_CHAR, self.TYPE_BLOCK):
+            raise ValueError("Unknown device type {}".format(self.dev_type))
 
         # the default behaviour of device access cgroups if unspecified is as follows
         if major is not None:
-            self.major = int(major)
+            self.major = _nonnegative_integer(major, 'major') if major != '*' else '*'
         else:
             self.major = "*"
 
         if minor is not None:
-            self.minor = int(minor)
+            self.minor = _nonnegative_integer(minor, 'minor') if minor != '*' else '*'
         else:
             self.minor = "*"
 
-        if isinstance(access, str):
+        if isinstance(access, bytes) and not isinstance(access, string_types):
+            access = access.decode('ascii')
+        if isinstance(access, string_types):
+            if any(char not in 'rwm' for char in access):
+                raise ValueError("Device permissions must contain only r, w and m")
             value = 0
             if 'r' in access:
                 value |= self.ACCESS_READ
@@ -73,7 +97,9 @@ class DeviceAccess(BaseContentType):
                 value |= self.ACCESS_MKNOD
             self.access = value
         else:
-            self.access = access or (self.ACCESS_READ | self.ACCESS_WRITE | self.ACCESS_MKNOD)
+            self.access = 7 if access is None else access
+            if not isinstance(self.access, integer_types) or not 0 <= self.access <= 7:
+                raise ValueError("Device permissions must be a mask between 0 and 7")
 
     def _check_access_bit(self, offset):
         mask = 1 << offset
@@ -103,42 +129,51 @@ class DeviceAccess(BaseContentType):
         return accstr
 
     def __str__(self):
+        if not self.access:
+            raise ValueError("A device access rule must specify at least one permission")
+        if self.dev_type in (self.TYPE_ALL, 'a') and (
+                self.major != '*' or self.minor != '*' or self.access != 7):
+            # The kernel treats 'a' as an all-devices command and ignores the
+            # remaining fields. Never imply narrower permissions than it grants.
+            raise ValueError("All-device rules require *:* and rwm permissions")
         return "{self.dev_type} {self.major}:{self.minor} {self.access_string}".format(self=self)
 
     def __eq__(self, other):
+        if not isinstance(other, DeviceAccess):
+            return NotImplemented
         return self.dev_type == other.dev_type and self.major == other.major \
                and self.minor == other.minor and self.access_string == other.access_string
 
     @classmethod
     def from_string(cls, value):
+        if isinstance(value, bytes) and not isinstance(value, string_types):
+            value = value.decode('ascii')
         dev_type, major_minor, access_string = value.split()
         major, minor = major_minor.split(":")
         major = int(major) if major != "*" else None
         minor = int(minor) if minor != "*" else None
 
-        access_mode = 0
-        for idx, char in enumerate("rwm"):
-            if char in access_string:
-                access_mode |= (1 << idx)
-        return cls(dev_type, major, minor, access_mode)
+        return cls(dev_type, major, minor, access_string)
 
 
 class DeviceThrottle(BaseContentType):
 
     def __init__(self, limit, major=None, minor=None, ):
-        self.limit = limit
+        self.limit = _nonnegative_integer(limit, 'limit')
 
         if major is not None and major != '*':
-            self.major = int(major)
+            self.major = _nonnegative_integer(major, 'major')
         else:
             self.major = '*'
 
         if minor is not None and minor != '*':
-            self.minor = int(minor)
+            self.minor = _nonnegative_integer(minor, 'minor')
         else:
             self.minor = '*'
 
     def __eq__(self, other):
+        if not isinstance(other, DeviceThrottle):
+            return NotImplemented
         return self.limit == other.limit and self.major == other.major and self.minor == other.minor
 
     def __str__(self):
@@ -147,9 +182,11 @@ class DeviceThrottle(BaseContentType):
     @classmethod
     def from_string(cls, value):
         try:
+            if isinstance(value, bytes) and not isinstance(value, string_types):
+                value = value.decode('ascii')
             major_minor, limit = value.split()
             major, minor = major_minor.split(":")
             return cls(int(limit), major, minor)
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             raise RuntimeError("Value {} cannot be converted to a string that matches the pattern: "
                                "[device major]:[device minor] [throttle limit in bytes]".format(value))

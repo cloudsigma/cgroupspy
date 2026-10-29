@@ -1,42 +1,49 @@
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/python/tags/
-image: python:3.8
+stages:
+  - test
+  - build
+  - deploy
 
-# Change pip's cache directory to be inside the project directory since we can
-# only cache local items.
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-# Pip's cache doesn't store the python packages
-# https://pip.pypa.io/en/stable/reference/pip_install/#caching
-#
-# If you want to also cache the installed packages, you have to install
-# them in a virtualenv and cache it as well.
 cache:
   paths:
     - .cache/pip
-    - venv/
-
-before_script:
-  - python -V  # Print out python version for debugging
-  - pip install virtualenv
-  - virtualenv venv
-  - source venv/bin/activate
 
 test:
+  stage: test
+  image: python:$PYTHON_VERSION
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
   script:
-    - pip install tox
-    - tox -e py27
-    - tox -e py38 -- --with-coverage
+    - python -m pip install -r requirements/test.txt
+    - python -m pip install .
+    - python -m nose2 -v
 
+distributions:
+  stage: build
+  image: python:3.14
+  script:
+    - python -m pip install build twine
+    - python -m build
+    - python -m twine check dist/*
+  artifacts:
+    paths:
+      - dist/
+
+# Preserve the private snapshots consumer's existing branch-based contract.
+# Project identity and completion status are managed on private GitLab.
 trigger_build:
   stage: deploy
+  image: python:3.14
+  rules:
+    - if: '$SNAPSHOTS_TOKEN && $CI_COMMIT_BRANCH'
   script:
-    - "curl -X POST -F token=$SNAPSHOTS_TOKEN -F ref=master -F variables[CGROUPSPY_BRANCH]=$CI_COMMIT_REF_NAME https://gitlab.dev.cloudsigma.com/api/v4/projects/49/trigger/pipeline"
-
-code_quality:
-  stage: .post
-  allow_failure: true
-  script:
-    - pip install flake8
-    - flake8 --extend-ignore=E501 cgroupspy
+    - >-
+      curl --fail --show-error --silent --request POST
+      --form "token=$SNAPSHOTS_TOKEN"
+      --form "ref=master"
+      --form "variables[CGROUPSPY_BRANCH]=$CI_COMMIT_REF_NAME"
+      --form "variables[CGROUPSPY_REVISION]=$CI_COMMIT_SHA"
+      https://gitlab.dev.cloudsigma.com/api/v4/projects/49/trigger/pipeline

@@ -30,6 +30,7 @@ from cgroupspy.contenttypes import DeviceAccess, DeviceThrottle
 
 from .interfaces import BaseFileInterface, FlagFile, BitFieldFile, IntegerFile, SplitValueFile, DictOrFlagFile
 from .interfaces import MultiLineIntegerFile, CommaDashSetFile, DictFile, IntegerListFile, TypedFile
+from .interfaces import OomControlFile
 
 
 class Controller(object):
@@ -49,32 +50,35 @@ class Controller(object):
     def filepath(self, filename):
         """The full path to a file"""
 
-        return os.path.join(self.node.full_path, filename)
+        root = self.node.full_path
+        # Nodes historically expose bytes paths, but callers also supply text
+        # paths (including custom Node implementations). Preserve the root type.
+        if isinstance(root, bytes) and not isinstance(filename, bytes):
+            filename = filename.encode('utf-8')
+        elif not isinstance(root, bytes) and isinstance(filename, bytes):
+            filename = filename.decode('utf-8')
+        return os.path.join(root, filename)
 
     def list_interfaces(self):
         result = {}
 
-        for data in [self.__class__.__dict__, Controller.__dict__]:
-            for k, interface in data.items():
-                if not issubclass(interface.__class__, BaseFileInterface):
+        seen = set()
+        for cls in self.__class__.__mro__:
+            for key, interface in cls.__dict__.items():
+                if key in seen:
                     continue
-
-                result[k] = interface
+                seen.add(key)
+                if isinstance(interface, BaseFileInterface):
+                    result[key] = interface
 
         return result
 
     def get_interface(self, key):
-        if key in self.__class__.__dict__:
-            interface = self.__class__.__dict__[key]
-        elif key in Controller.__dict__:
-            interface = Controller.__dict__[key]
-        else:
-            return None
-
-        if not issubclass(interface.__class__, BaseFileInterface):
-            return None
-
-        return interface
+        for cls in self.__class__.__mro__:
+            if key in cls.__dict__:
+                interface = cls.__dict__[key]
+                return interface if isinstance(interface, BaseFileInterface) else None
+        return None
 
     def get_property(self, filename):
         """Opens the file and reads the value"""
@@ -82,7 +86,7 @@ class Controller(object):
         with open(self.filepath(filename)) as f:
             return f.read().strip()
 
-    def get_content(self, key):
+    def get_content(self, key, strict=False):
         interface = self.get_interface(key)
 
         if interface is None or interface.writeonly:
@@ -91,6 +95,8 @@ class Controller(object):
         try:
             content = self.get_property(interface.filename)
         except IOError as e:
+            if strict:
+                raise
             if e.errno == errno.ENOENT:
                 # does not exist
                 return None
@@ -110,6 +116,11 @@ class Controller(object):
     def set_property(self, filename, value):
         """Opens the file and writes the value"""
 
+        if getattr(self.node, 'read_only', False):
+            raise IOError(errno.EACCES, "Cannot write through a read-only cgroup tree",
+                          self.filepath(filename))
+        if hasattr(self.node, '_assert_writable'):
+            self.node._assert_writable()
         with open(self.filepath(filename), "w") as f:
             return f.write(str(value))
 
@@ -173,6 +184,8 @@ class CpuSetController(Controller):
     mem_hardwall = FlagFile("cpuset.mem_hardwall")
     memory_migrate = FlagFile("cpuset.memory_migrate")
     memory_pressure = FlagFile("cpuset.memory_pressure")
+    # Keep the historical boolean property; expose the complete measurement too.
+    memory_pressure_rate = IntegerFile("cpuset.memory_pressure", readonly=True)
     memory_pressure_enabled = FlagFile("cpuset.memory_pressure_enabled")
     memory_spread_page = FlagFile("cpuset.memory_spread_page")
     memory_spread_slab = FlagFile("cpuset.memory_spread_slab")
@@ -222,7 +235,7 @@ class MemoryController(Controller):
 
     use_hierarchy = FlagFile("memory.use_hierarchy")
     force_empty = FlagFile("memory.force_empty")
-    oom_control = DictOrFlagFile("memory.oom_control")
+    oom_control = OomControlFile("memory.oom_control")
 
     move_charge_at_immigrate = BitFieldFile("memory.move_charge_at_immigrate")
 
@@ -298,8 +311,8 @@ class BlkIOController(Controller):
     # throttle_io_serviced =
     throttle_read_bps_device = TypedFile("blkio.throttle.read_bps_device", contenttype=DeviceThrottle, many=True)
     throttle_read_iops_device = TypedFile("blkio.throttle.read_iops_device", contenttype=DeviceThrottle, many=True)
-    throttle_write_bps_device = TypedFile("blkio.throttle.write_bps_device ", contenttype=DeviceThrottle, many=True)
-    throttle_write_iops_device = TypedFile("blkio.throttle.write_iops_device ", contenttype=DeviceThrottle, many=True)
+    throttle_write_bps_device = TypedFile("blkio.throttle.write_bps_device", contenttype=DeviceThrottle, many=True)
+    throttle_write_iops_device = TypedFile("blkio.throttle.write_iops_device", contenttype=DeviceThrottle, many=True)
     # time =
     # time_recursive =
     weight = IntegerFile("blkio.weight")
