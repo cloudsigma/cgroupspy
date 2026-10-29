@@ -11,6 +11,7 @@ permissions:
 jobs:
   legacy-python:
     runs-on: ubuntu-24.04
+    needs: distributions
     strategy:
       fail-fast: false
       matrix:
@@ -18,10 +19,20 @@ jobs:
     container: python:${{ matrix.python }}
     steps:
       - uses: actions/checkout@v7
-      - name: Install supported test dependencies and package
+      - uses: actions/download-artifact@v7
+        with:
+          name: distributions
+          path: dist
+      - name: Install the release wheel using legacy packaging tools
         run: |
           python -m pip install -r requirements/test.txt
-          python -m pip install .
+          python -m pip install dist/*.whl
+          python -m pip install --no-deps --force-reinstall .
+      - name: Verify release wheel imports outside the checkout
+        run: |
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+          cd "$(mktemp -d)"
+          python -c 'import cgroupspy; from cgroupspy.v2 import V2Tree; from cgroupspy.discovery import discover; print(cgroupspy.__version__)'
       - name: Test legacy contract and new APIs
         run: python -m nose2 -v
 
