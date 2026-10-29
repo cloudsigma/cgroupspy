@@ -16,6 +16,18 @@ Use the existing `cgroupspy.trees` APIs for v1 hierarchies and
 `cgroupspy.v2.V2Tree` for a unified v2 hierarchy. Their resource units and
 controller semantics remain distinct.
 
+Install the 0.3.0 GitHub release
+-------------------------------
+
+```sh
+python -m pip install "https://github.com/cloudsigma/cgroupspy/releases/download/v0.3.0/cgroupspy-0.3.0-py2.py3-none-any.whl"
+```
+
+The [versioned release](https://github.com/cloudsigma/cgroupspy/releases/tag/v0.3.0)
+also contains the source archive and SHA-256 checksums. GitHub release files are
+available independently of PyPI publication; check the installed package version
+before using the new API.
+
 Read a cgroup v2 subtree
 -----------------------
 
