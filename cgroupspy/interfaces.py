@@ -112,6 +112,7 @@ class BaseFileInterface(object):
                         completed.append(record)
                 return result
             return instance.set_property(self.filename, value)
+        return None
 
     def sanitize_get(self, value):
         return value
@@ -151,6 +152,7 @@ class BitFieldFile(BaseFileInterface):
         try:
             value = value.encode()
         except AttributeError:
+            # Integer values and bit sequences do not need string encoding.
             pass
         if isinstance(value, bytes) or not isinstance(value, Iterable):
             return int(value)
@@ -253,6 +255,7 @@ class CommaDashSetFile(BaseFileInterface):
         try:
             value = value.decode()
         except AttributeError:
+            # Text strings and integer sequences do not need byte decoding.
             pass
 
         if isinstance(value, string_types):

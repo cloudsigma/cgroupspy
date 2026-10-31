@@ -165,25 +165,28 @@ def _device(value):
     return value
 
 
-def _cloexec(descriptor):
-    try:
-        if hasattr(os, 'set_inheritable'):
-            os.set_inheritable(descriptor, False)
-        else:
-            flags = fcntl.fcntl(descriptor, fcntl.F_GETFD)
-            fcntl.fcntl(descriptor, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
-        return descriptor
-    except Exception:
-        os.close(descriptor)
-        raise
+def _set_cloexec(descriptor):
+    """Set descriptor flags; the acquisition scope retains ownership."""
+    if hasattr(os, 'set_inheritable'):
+        os.set_inheritable(descriptor, False)
+    else:
+        flags = fcntl.fcntl(descriptor, fcntl.F_GETFD)
+        fcntl.fcntl(descriptor, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
 
 
 def _open_at(directory, name, flags):
     """Use openat, or Linux procfs for the retained Python 2.7 runtime."""
     flags |= getattr(os, 'O_CLOEXEC', 0) | getattr(os, 'O_NOFOLLOW', 0)
     if os.open in getattr(os, 'supports_dir_fd', ()):
-        return _cloexec(os.open(name, flags, dir_fd=directory))
-    return _cloexec(os.open('/proc/self/fd/{}/{}'.format(directory, name), flags))
+        descriptor = os.open(name, flags, dir_fd=directory)
+    else:
+        descriptor = os.open('/proc/self/fd/{}/{}'.format(directory, name), flags)
+    try:
+        _set_cloexec(descriptor)
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
 
 
 def _stat_at(directory, name):
@@ -232,8 +235,9 @@ class V2Tree(object):
         self._root_fd = None
         flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0)
         flags |= getattr(os, 'O_CLOEXEC', 0) | getattr(os, 'O_NOFOLLOW', 0)
-        self._root_fd = _cloexec(os.open(self.root_path, flags))
+        self._root_fd = os.open(self.root_path, flags)
         try:
+            _set_cloexec(self._root_fd)
             self.root.read_raw('cgroup.controllers')
         except Exception:
             self.close()
@@ -252,6 +256,7 @@ class V2Tree(object):
         try:
             self.close()
         except Exception:
+            # Best-effort cleanup for partial initialization and interpreter shutdown.
             pass
 
     def __enter__(self):
@@ -263,8 +268,9 @@ class V2Tree(object):
     def _directory(self, parts):
         if self._root_fd is None:
             raise ValueError('The cgroup tree is closed')
-        directory = _cloexec(os.dup(self._root_fd))
+        directory = os.dup(self._root_fd)
         try:
+            _set_cloexec(directory)
             for name in parts:
                 child = _open_at(directory, name, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
                 os.close(directory)
