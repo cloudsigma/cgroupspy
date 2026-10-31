@@ -28,7 +28,7 @@ import os
 import errno
 from cgroupspy.contenttypes import DeviceAccess, DeviceThrottle
 
-from .interfaces import BaseFileInterface, FlagFile, BitFieldFile, IntegerFile, SplitValueFile, DictOrFlagFile
+from .interfaces import BaseFileInterface, FlagFile, BitFieldFile, IntegerFile, SplitValueFile
 from .interfaces import MultiLineIntegerFile, CommaDashSetFile, DictFile, IntegerListFile, TypedFile
 from .interfaces import OomControlFile
 

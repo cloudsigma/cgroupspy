@@ -7,6 +7,11 @@ import shutil
 import tempfile
 import unittest
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
 from cgroupspy import v2
 
 
@@ -83,6 +88,51 @@ class V2Tests(unittest.TestCase):
             self.assertEqual(other.root.path, '/')
         with self.assertRaises(ValueError):
             other.root.procs
+
+    def test_root_descriptor_closes_when_cloexec_setup_fails(self):
+        descriptors = []
+
+        def fail_cloexec(descriptor):
+            descriptors.append(descriptor)
+            raise OSError(errno.EIO, 'Cannot configure descriptor flags')
+
+        with mock.patch.object(v2, '_set_cloexec', side_effect=fail_cloexec):
+            with self.assertRaises(OSError):
+                v2.V2Tree(self.root_path)
+        self.assertEqual(len(descriptors), 1)
+        with self.assertRaises(OSError) as caught:
+            os.fstat(descriptors[0])
+        self.assertEqual(caught.exception.errno, errno.EBADF)
+
+    def test_open_at_closes_when_cloexec_setup_fails(self):
+        for native_openat in (False, True):
+            descriptor = os.open(self.root_path, os.O_RDONLY)
+            with mock.patch.object(v2.os, 'open', return_value=descriptor) as open_file:
+                supported = set([open_file]) if native_openat else set()
+                with mock.patch.object(v2.os, 'supports_dir_fd', supported, create=True):
+                    with mock.patch.object(v2, '_set_cloexec', side_effect=OSError(errno.EIO, 'Flag failure')):
+                        with self.assertRaises(OSError):
+                            v2._open_at(123, 'cgroup.procs', os.O_RDONLY)
+            with self.assertRaises(OSError) as caught:
+                os.fstat(descriptor)
+            self.assertEqual(caught.exception.errno, errno.EBADF)
+
+    def test_directory_duplicate_closes_when_cloexec_setup_fails(self):
+        tree = self.tree()
+        descriptors = []
+
+        def fail_cloexec(descriptor):
+            descriptors.append(descriptor)
+            raise OSError(errno.EIO, 'Cannot configure descriptor flags')
+
+        with mock.patch.object(v2, '_set_cloexec', side_effect=fail_cloexec):
+            with self.assertRaises(OSError):
+                tree._directory(())
+        self.assertEqual(len(descriptors), 1)
+        with self.assertRaises(OSError) as caught:
+            os.fstat(descriptors[0])
+        self.assertEqual(caught.exception.errno, errno.EBADF)
+        self.assertEqual(tree.root.procs, set([7, 42]))
 
     def test_tree_children_are_live_and_paths_are_native_text(self):
         tree = self.tree()

@@ -205,6 +205,7 @@ class Tree(BaseTree):
         for node in self.walk():
             if node.path == path:
                 return node
+        return None
 
 
 class GroupedTree(object):
@@ -288,6 +289,7 @@ class GroupedTree(object):
         for node in self.walk():
             if pattern in node.name:
                 return node
+        return None
 
     def get_node_by_path(self, path):
         """Return the first legacy normalized match; use raw paths to avoid collisions."""
@@ -295,6 +297,7 @@ class GroupedTree(object):
         for node in self.walk():
             if path == node.path:
                 return node
+        return None
 
     def get_nodes_by_path(self, path):
         """Return all matches for a legacy path that may omit scope/slice suffixes."""
@@ -307,6 +310,7 @@ class GroupedTree(object):
         for node in self.walk():
             if node.raw_path == path:
                 return node
+        return None
 
 
 class VMTree(GroupedTree):
@@ -344,3 +348,4 @@ class VMTree(GroupedTree):
         for key in keys:
             if key in self.vms:
                 return self.vms[key]
+        return None

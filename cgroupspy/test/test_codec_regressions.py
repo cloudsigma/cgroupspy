@@ -15,7 +15,7 @@ from ..contenttypes import DeviceAccess, DeviceThrottle
 from ..controllers import (BlkIOController, Controller, CpuController,
                            CpuSetController, DevicesController, MemoryController,
                            NetPrioController)
-from ..interfaces import (BaseFileInterface, BatchWriteError, CommaDashSetFile,
+from ..interfaces import (BatchWriteError, CommaDashSetFile,
                           DictFile, DictOrFlagFile, IntegerFile, IntegerListFile,
                           ListFile, MultiLineIntegerFile, OomControlFile,
                           SplitValueFile, TypedFile)
@@ -46,8 +46,8 @@ class CodecRegressionTests(TestCase):
             self.assertRaises(ValueError, str, rule)
 
     def test_contenttype_equality_handles_other_objects(self):
-        self.assertFalse(DeviceAccess('c', 1, 3) == object())
-        self.assertFalse(DeviceThrottle(10, 8, 0) == object())
+        self.assertIs(DeviceAccess('c', 1, 3) == object(), False)
+        self.assertIs(DeviceThrottle(10, 8, 0) == object(), False)
 
     def test_device_throttle_rejects_invalid_numeric_fields(self):
         for value in (-1, 1.5, '1\n8:16 2'):

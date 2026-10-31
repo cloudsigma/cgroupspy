@@ -81,9 +81,11 @@ def v2():
 
             # Gate CPU work until after migration, then verify actual throttling.
             before = target.cpu.stat['nr_throttled']
-            busy = subprocess.Popen([sys.executable, '-c',
+            busy_script = (
                 'import sys,time; sys.stdin.read(1); end=time.process_time()+0.2\n'
-                'while time.process_time()<end: pass'], stdin=subprocess.PIPE)
+                'while time.process_time()<end: pass')
+            busy = subprocess.Popen([sys.executable, '-c', busy_script],
+                                    stdin=subprocess.PIPE)
             processes.append(busy)
             target.attach_process(busy.pid)
             busy.stdin.write(b'g')
